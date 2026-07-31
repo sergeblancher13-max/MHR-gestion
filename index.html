@@ -3025,43 +3025,58 @@ function doLogout(){
 }
 
 // Reagit a l'etat de connexion (login, signup, refresh de page, logout)
-fbAuth.onAuthStateChanged(function(user){
-  if(user){
-    db.collection('roles').doc(user.uid).get().then(function(doc){
-      if(!doc.exists){
-        // Compte Firebase cree mais aucune autorisation accordee -> acces bloque
-        document.getElementById('login-screen').style.display='flex';
-        document.getElementById('app-main').style.display='none';
-        document.getElementById('login-err').innerText="Ce compte n'est pas autorisé à accéder aux données. Demande à l'administrateur de t'inviter, puis reconnecte-toi.";
-        fbAuth.signOut();
+function tryLoadUserRole(user,attempt){
+  db.collection('roles').doc(user.uid).get().then(function(doc){
+    if(!doc.exists){
+      // Le compte vient peut-etre d'etre cree a l'instant : le document de role
+      // peut prendre une fraction de seconde a apparaitre. On reessaie 3 fois.
+      if(attempt<3){
+        setTimeout(function(){ tryLoadUserRole(user,attempt+1); },900);
         return;
       }
-      var roleData=doc.data();
-      currentUser={uid:user.uid,email:user.email,name:roleData.name||user.email,role:roleData.role||'readOnly'};
-      document.getElementById('login-err').innerText='';
-      document.getElementById('login-screen').style.display='none';
-      document.getElementById('app-main').style.display='flex';
-      switchEq(2);
-      var allActive=['active-cadettes','active-espoirs','active-elite','active-cdf','active-acad'];
-      for(var i=0;i<5;i++){
-        var b=document.getElementById('eq-btn-'+i);
-        if(b) b.classList.remove.apply(b.classList,allActive);
-      }
-      document.getElementById('eq-btn-2').classList.add('active-elite');
-      setPgType('match');
-      document.getElementById('last-save-label').innerText='Connecte : '+currentUser.name;
-      var badge=document.getElementById('current-role-badge');
-      var roleLabels={admin:'👑 Admin',editor:'✏️ Éditeur',readOnly:'👁 Lecture seule'};
-      if(badge) badge.innerText=roleLabels[currentUser.role]||currentUser.role;
-      applyAccessControl();
-      attachTeamListeners();
-    }).catch(function(err){
-      console.error('Erreur lecture role:',err);
       document.getElementById('login-screen').style.display='flex';
       document.getElementById('app-main').style.display='none';
-      document.getElementById('login-err').innerText="Accès refusé. Contacte l'administrateur.";
+      document.getElementById('login-err').innerText="Ce compte n'est pas autorisé à accéder aux données. Demande à l'administrateur de t'inviter, puis reconnecte-toi.";
       fbAuth.signOut();
-    });
+      return;
+    }
+    var roleData=doc.data();
+    currentUser={uid:user.uid,email:user.email,name:roleData.name||user.email,role:roleData.role||'readOnly'};
+    document.getElementById('login-err').innerText='';
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app-main').style.display='flex';
+    switchEq(2);
+    var allActive=['active-cadettes','active-espoirs','active-elite','active-cdf','active-acad'];
+    for(var i=0;i<5;i++){
+      var b=document.getElementById('eq-btn-'+i);
+      if(b) b.classList.remove.apply(b.classList,allActive);
+    }
+    document.getElementById('eq-btn-2').classList.add('active-elite');
+    setPgType('match');
+    document.getElementById('last-save-label').innerText='Connecte : '+currentUser.name;
+    var badge=document.getElementById('current-role-badge');
+    var roleLabels={admin:'👑 Admin',editor:'✏️ Éditeur',readOnly:'👁 Lecture seule'};
+    if(badge) badge.innerText=roleLabels[currentUser.role]||currentUser.role;
+    applyAccessControl();
+    attachTeamListeners();
+  }).catch(function(err){
+    // Erreur de permission juste apres creation de compte : on retente aussi,
+    // le document de role peut ne pas encore etre visible cote regles.
+    if(attempt<3){
+      setTimeout(function(){ tryLoadUserRole(user,attempt+1); },900);
+      return;
+    }
+    console.error('Erreur lecture role:',err);
+    document.getElementById('login-screen').style.display='flex';
+    document.getElementById('app-main').style.display='none';
+    document.getElementById('login-err').innerText="Accès refusé. Contacte l'administrateur.";
+    fbAuth.signOut();
+  });
+}
+
+fbAuth.onAuthStateChanged(function(user){
+  if(user){
+    tryLoadUserRole(user,0);
   } else {
     currentUser=null;
     document.getElementById('login-screen').style.display='flex';
