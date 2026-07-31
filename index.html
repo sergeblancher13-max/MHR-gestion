@@ -25,6 +25,7 @@
   firebase.initializeApp(firebaseConfig);
   var fbAuth = firebase.auth();
   var db = firebase.firestore();
+  db.settings({ experimentalAutoDetectLongPolling: true, useFetchStreams: false });
   var ADMIN_BOOTSTRAP_EMAIL = "serge.blancher@pierrerouge.com";
 </script>
 <style>
@@ -220,6 +221,32 @@ button{font-family:"Barlow",sans-serif;}
 .pa-cr{background:#DC2626;}
 .pa-bless{background:#64748B;}
 .ev-item{display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:8px;background:#F8FAFD;border-left:3px solid var(--mhr2);margin-bottom:4px;font-size:11px;}
+
+/* =================================================
+   RESPONSIVE / MOBILE
+   ================================================= */
+.login-box{width:min(380px,92vw);}
+#mobile-sidebar-overlay{display:none;}
+@media (max-width:860px){
+  #mobile-menu-btn{display:inline-block!important;}
+  aside{
+    position:fixed!important;top:0;left:0;height:100vh;z-index:200;
+    transform:translateX(-100%);transition:transform .25s ease;
+  }
+  aside.sidebar-open{transform:translateX(0);}
+  #mobile-sidebar-overlay.show{
+    display:block;position:fixed;inset:0;background:rgba(5,13,28,.55);z-index:150;
+  }
+  header{padding-left:12px;padding-right:12px;}
+  header h2{font-size:14px;}
+  .kpi-value{font-size:1.5rem;}
+  .login-box{padding:24px;}
+}
+@media (max-width:480px){
+  header .flex.items-center.gap-3:nth-child(2){gap:6px;}
+  .live-hero{flex-direction:column;align-items:stretch!important;}
+  .live-score-num{font-size:1.7rem;}
+}
 </style>
 </head>
 <body class="bg-gray-100">
@@ -263,8 +290,30 @@ button{font-family:"Barlow",sans-serif;}
 <div id="modal-users" class="modal-overlay" onclick="closeModalIfOverlay(event)">
   <div class="modal-box" style="max-width:520px">
     <h3 class="text-base font-black text-mhr mb-4 uppercase">Gestion des Utilisateurs</h3>
-    <p class="text-xs text-gray-400 mb-4">Chaque collaborateur crée son propre compte depuis l'écran de connexion. Attribue-lui ensuite un rôle ici.</p>
-    <div id="users-list" class="space-y-2 mb-2 max-h-80 overflow-y-auto"></div>
+    <p class="text-xs text-gray-400 mb-4">Personne ne peut consulter ou modifier les données sans avoir été invité par un administrateur.</p>
+
+    <div id="invite-form-section" class="mb-4 p-3 bg-blue-50 rounded-xl">
+      <p class="text-xs font-black text-mhr mb-2 uppercase">Inviter un collaborateur</p>
+      <div class="flex gap-2 flex-wrap items-center">
+        <input type="email" id="invite-email" placeholder="email@exemple.com" class="border rounded-lg p-2 text-xs flex-1 min-w-[160px]">
+        <select id="invite-role" class="border rounded-lg p-2 text-xs">
+          <option value="readOnly">Lecture seule</option>
+          <option value="editor">Éditeur</option>
+          <option value="admin">Admin</option>
+        </select>
+        <button onclick="sendInvite()" class="btn btn-accent btn-sm"><i class="fas fa-paper-plane"></i>Inviter</button>
+      </div>
+      <div id="invite-err" class="text-red-500 text-xs mt-1 min-h-4"></div>
+      <p class="text-xs text-gray-400 mt-2">La personne pourra ensuite créer son propre compte avec cette adresse email exacte, depuis l'écran de connexion.</p>
+    </div>
+
+    <div id="pending-invites-section">
+      <p class="text-xs font-black text-gray-500 uppercase mb-2">Invitations en attente</p>
+      <div id="invites-list" class="space-y-1.5 mb-4 max-h-32 overflow-y-auto"></div>
+    </div>
+
+    <p class="text-xs font-black text-gray-500 uppercase mb-2">Comptes actifs</p>
+    <div id="users-list" class="space-y-2 mb-2 max-h-64 overflow-y-auto"></div>
     <div id="users-list-loading" class="text-xs text-gray-400 italic">Chargement...</div>
     <div class="flex gap-3 mt-4 justify-end border-t pt-4">
       <button onclick="closeModal('modal-users')" class="px-4 py-2 rounded-lg border font-bold text-xs text-gray-600 hover:bg-gray-50">Fermer</button>
@@ -293,6 +342,7 @@ button{font-family:"Barlow",sans-serif;}
 </div>
 
 <div class="flex h-screen overflow-hidden" id="app-main">
+<div id="mobile-sidebar-overlay" onclick="toggleMobileSidebar()"></div>
 
 <!-- SIDEBAR -->
 <aside class="w-56 bg-mhr text-white flex flex-col shrink-0 shadow-xl ciste-motif" style="min-width:224px;background-color:var(--mhr)">
@@ -370,8 +420,11 @@ button{font-family:"Barlow",sans-serif;}
 
 <!-- MAIN -->
 <main class="flex-1 flex flex-col overflow-hidden">
-  <header class="bg-white shadow-sm py-2.5 px-5 flex justify-between items-center border-b-2" style="border-color:var(--mhr2)">
-    <h2 id="tab-title" class="text-base font-black text-mhr" style="font-family:'Oswald',sans-serif;letter-spacing:.02em">Dashboard</h2>
+  <header class="bg-white shadow-sm py-2.5 px-5 flex justify-between items-center border-b-2 flex-wrap gap-2" style="border-color:var(--mhr2)">
+    <div class="flex items-center gap-3">
+      <button onclick="toggleMobileSidebar()" id="mobile-menu-btn" class="hidden" style="background:none;border:none;color:var(--mhr);font-size:20px;cursor:pointer"><i class="fas fa-bars"></i></button>
+      <h2 id="tab-title" class="text-base font-black text-mhr" style="font-family:'Oswald',sans-serif;letter-spacing:.02em">Dashboard</h2>
+    </div>
     <div class="flex items-center gap-3">
       <span id="eq-label" class="text-xs font-black px-3 py-1 rounded-full" style="background:#e0f2fe;color:#0369a1">ELITE</span>
       <!-- Rôle réel de l'utilisateur connecté (Firestore) -->
@@ -411,6 +464,11 @@ button{font-family:"Barlow",sans-serif;}
   <div id="ro-banner" style="display:none" class="bg-yellow-400 text-yellow-900 text-xs font-black py-1.5 px-4 flex items-center gap-2 border-b border-yellow-500">
     <i class="fas fa-lock"></i>
     <span>MODE LECTURE SEULE — Les modifications sont désactivées. Changez le rôle en "Éditeur" ou "Admin" pour modifier.</span>
+  </div>
+  <div id="sync-error-banner" style="display:none" class="bg-red-600 text-white text-xs font-black py-1.5 px-4 flex items-center gap-2 border-b border-red-800">
+    <i class="fas fa-triangle-exclamation"></i>
+    <span id="sync-error-text">Erreur de synchronisation</span>
+    <button onclick="document.getElementById('sync-error-banner').style.display='none'" style="margin-left:auto;background:none;border:none;color:#fff;font-weight:900;cursor:pointer">✕</button>
   </div>
   <div class="flex-1 overflow-y-auto p-4">
 
@@ -510,7 +568,7 @@ button{font-family:"Barlow",sans-serif;}
         <div id="shared-export-list" class="space-y-1 text-xs"></div>
       </div>
     </div>
-    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <div class="bg-white rounded-xl shadow-sm overflow-x-auto">
       <table class="w-full text-left text-xs">
         <thead class="bg-gray-50 border-b">
           <tr>
@@ -1361,6 +1419,26 @@ var pendingCompo={};
 // =================================================
 // SAVE
 // =================================================
+function showSyncError(msg){
+  var banner=document.getElementById('sync-error-banner');
+  var txt=document.getElementById('sync-error-text');
+  if(txt) txt.innerText=msg;
+  if(banner) banner.style.display='flex';
+}
+function hideSyncError(){
+  var banner=document.getElementById('sync-error-banner');
+  if(banner) banner.style.display='none';
+}
+function friendlyFirestoreError(err){
+  if(err&&err.code==='permission-denied'){
+    return "Accès refusé par Firestore : vérifie que les règles de sécurité sont bien publiées dans la console Firebase (Firestore Database → Règles), et que ton compte a bien le rôle Éditeur ou Admin.";
+  }
+  if(err&&err.code==='unavailable'){
+    return "Connexion à Firestore impossible (hors-ligne ?). Les modifications seront enregistrées dès que la connexion revient.";
+  }
+  return "Erreur Firestore : "+(err&&err.message?err.message:err);
+}
+
 function save(){
   var idx=curEq;
   var dot=document.getElementById('save-dot');
@@ -1370,11 +1448,13 @@ function save(){
     var now=new Date();
     document.getElementById('last-save-label').innerText='Sauvegarde '+now.getHours()+':'+String(now.getMinutes()).padStart(2,'0');
     dot.style.background='#22c55e';
+    hideSyncError();
     setTimeout(function(){dot.style.background='#d1d5db';},1500);
   }).catch(function(err){
     document.getElementById('last-save-label').innerText='Erreur de sauvegarde';
     dot.style.background='#dc2626';
     console.error('Erreur Firestore save:',err);
+    showSyncError(friendlyFirestoreError(err));
   });
 }
 function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(save,800);}
@@ -1397,6 +1477,7 @@ function attachTeamListeners(){
   for(var i=0;i<5;i++){
     (function(idx){
       var unsub=db.collection('teams').doc(String(idx)).onSnapshot(function(doc){
+        hideSyncError();
         if(doc.metadata.hasPendingWrites) return; // c'est notre propre ecriture qui revient, on ignore
         if(doc.exists){
           ALL[idx]=normalizeEq(doc.data());
@@ -1404,7 +1485,10 @@ function attachTeamListeners(){
           ALL[idx]=normalizeEq(mkEq());
         }
         if(idx===curEq) refreshCurrentTab();
-      },function(err){ console.error('Erreur ecoute Firestore equipe '+idx,err); });
+      },function(err){
+        console.error('Erreur ecoute Firestore equipe '+idx,err);
+        showSyncError(friendlyFirestoreError(err));
+      });
       teamListeners.push(unsub);
     })(i);
   }
@@ -1471,7 +1555,23 @@ function showTab(id){
   if(id==='matchs-equipe') renderMatchHistory();
   if(id==='standards'){loadStdTech();loadStdPhys();}
   if(id==='match-live') renderMatchLive();
+  closeMobileSidebarIfOpen();
   return false;
+}
+
+function toggleMobileSidebar(){
+  var aside=document.querySelector('aside');
+  var overlay=document.getElementById('mobile-sidebar-overlay');
+  if(!aside) return;
+  var opening=!aside.classList.contains('sidebar-open');
+  aside.classList.toggle('sidebar-open');
+  if(overlay) overlay.classList.toggle('show',opening);
+}
+function closeMobileSidebarIfOpen(){
+  var aside=document.querySelector('aside');
+  var overlay=document.getElementById('mobile-sidebar-overlay');
+  if(aside) aside.classList.remove('sidebar-open');
+  if(overlay) overlay.classList.remove('show');
 }
 
 // =================================================
@@ -2878,10 +2978,27 @@ function doAuthAction(){
     var name=document.getElementById('login-name').value.trim();
     if(!name){errEl.innerText='Indique ton nom.';return;}
     if(pass.length<6){errEl.innerText='Mot de passe : 6 caractères minimum.';return;}
+    errEl.innerText='Vérification de l\'invitation...';
     fbAuth.createUserWithEmailAndPassword(email,pass).then(function(cred){
-      var role=(email===ADMIN_BOOTSTRAP_EMAIL.toLowerCase())?'admin':'readOnly';
-      return db.collection('roles').doc(cred.user.uid).set({email:email,name:name,role:role});
-    }).catch(function(err){ errEl.innerText=translateFirebaseError(err); });
+      var user=cred.user;
+      if(email===ADMIN_BOOTSTRAP_EMAIL.toLowerCase()){
+        return db.collection('roles').doc(user.uid).set({email:email,name:name,role:'admin'});
+      }
+      return db.collection('invites').doc(email).get().then(function(inv){
+        if(!inv.exists){
+          return user.delete().then(function(){
+            var e=new Error('not-invited');e.code='custom/not-invited';throw e;
+          });
+        }
+        return db.collection('roles').doc(user.uid).set({email:email,name:name,role:inv.data().role||'readOnly'});
+      });
+    }).then(function(){
+      errEl.innerText='';
+    }).catch(function(err){
+      errEl.innerText=(err.code==='custom/not-invited')
+        ? "Cette adresse n'a pas encore été invitée par l'administrateur. Demande-lui de t'ajouter dans Outils → Utilisateurs."
+        : translateFirebaseError(err);
+    });
   } else {
     fbAuth.signInWithEmailAndPassword(email,pass).catch(function(err){
       errEl.innerText=translateFirebaseError(err);
@@ -2911,7 +3028,15 @@ function doLogout(){
 fbAuth.onAuthStateChanged(function(user){
   if(user){
     db.collection('roles').doc(user.uid).get().then(function(doc){
-      var roleData=doc.exists?doc.data():{role:'readOnly',name:user.email};
+      if(!doc.exists){
+        // Compte Firebase cree mais aucune autorisation accordee -> acces bloque
+        document.getElementById('login-screen').style.display='flex';
+        document.getElementById('app-main').style.display='none';
+        document.getElementById('login-err').innerText="Ce compte n'est pas autorisé à accéder aux données. Demande à l'administrateur de t'inviter, puis reconnecte-toi.";
+        fbAuth.signOut();
+        return;
+      }
+      var roleData=doc.data();
       currentUser={uid:user.uid,email:user.email,name:roleData.name||user.email,role:roleData.role||'readOnly'};
       document.getElementById('login-err').innerText='';
       document.getElementById('login-screen').style.display='none';
@@ -2930,6 +3055,12 @@ fbAuth.onAuthStateChanged(function(user){
       if(badge) badge.innerText=roleLabels[currentUser.role]||currentUser.role;
       applyAccessControl();
       attachTeamListeners();
+    }).catch(function(err){
+      console.error('Erreur lecture role:',err);
+      document.getElementById('login-screen').style.display='flex';
+      document.getElementById('app-main').style.display='none';
+      document.getElementById('login-err').innerText="Accès refusé. Contacte l'administrateur.";
+      fbAuth.signOut();
     });
   } else {
     currentUser=null;
@@ -2942,6 +3073,16 @@ fbAuth.onAuthStateChanged(function(user){
 });
 
 function renderUsersList(){
+  var isAdmin=currentUser&&currentUser.role==='admin';
+  renderActiveAccounts();
+  if(isAdmin) renderPendingInvites();
+  var inviteSection=document.getElementById('invite-form-section');
+  if(inviteSection) inviteSection.style.display=isAdmin?'block':'none';
+  var pendingSection=document.getElementById('pending-invites-section');
+  if(pendingSection) pendingSection.style.display=isAdmin?'block':'none';
+}
+
+function renderActiveAccounts(){
   var cont=document.getElementById('users-list');
   var loading=document.getElementById('users-list-loading');
   loading.classList.remove('hidden');
@@ -2956,13 +3097,15 @@ function renderUsersList(){
       var u=doc.data();
       var uid=doc.id;
       var div=document.createElement('div');
-      div.className='flex items-center justify-between bg-gray-50 rounded-lg p-2 text-xs';
+      div.className='flex items-center justify-between bg-gray-50 rounded-lg p-2 text-xs gap-2';
+      var isSelf=currentUser&&uid===currentUser.uid;
       var selectHtml=isAdmin?
-        '<select onchange="changeUserRole(\''+uid+'\',this.value)" class="text-xs font-bold border rounded px-1 py-0.5">'+
+        '<select onchange="changeUserRole(\''+uid+'\',this.value)" class="text-xs font-bold border rounded px-1 py-0.5" '+(isSelf?'disabled title="Tu ne peux pas changer ton propre rôle"':'')+'>'+
           ['admin','editor','readOnly'].map(function(r){return '<option value="'+r+'"'+(u.role===r?' selected':'')+'>'+roleLabels[r]+'</option>';}).join('')+
         '</select>' :
         '<span class="px-2 py-0.5 rounded-full text-xs '+(roleColors[u.role]||roleColors.readOnly)+'">'+(roleLabels[u.role]||u.role)+'</span>';
-      div.innerHTML='<div><span class="font-bold">'+(u.name||u.email)+'</span> <span class="text-gray-400">('+u.email+')</span></div>'+selectHtml;
+      var delBtn=(isAdmin&&!isSelf)?'<button onclick="revokeUserAccess(\''+uid+'\',\''+(u.email||'')+'\')" title="Révoquer l\'accès" class="text-red-400 hover:text-red-600 font-bold px-1">✕</button>':'';
+      div.innerHTML='<div class="flex-1"><span class="font-bold">'+(u.name||u.email)+'</span> <span class="text-gray-400">('+u.email+')</span></div><div class="flex items-center gap-1.5">'+selectHtml+delBtn+'</div>';
       cont.appendChild(div);
     });
   }).catch(function(err){
@@ -2972,8 +3115,62 @@ function renderUsersList(){
 }
 function changeUserRole(uid,role){
   db.collection('roles').doc(uid).update({role:role}).then(function(){
-    renderUsersList();
+    renderActiveAccounts();
   }).catch(function(err){ alert('Erreur : '+err.message); });
+}
+function revokeUserAccess(uid,email){
+  if(!confirm("Révoquer l'accès de "+(email||'cet utilisateur')+" ?\n\nSon compte de connexion existera toujours techniquement, mais il perdra immédiatement tout accès aux données (lecture et écriture). Il faudra le ré-inviter pour qu'il retrouve l'accès.")) return;
+  db.collection('roles').doc(uid).delete().then(function(){
+    if(email) db.collection('invites').doc(email).delete().catch(function(){});
+    renderActiveAccounts();
+  }).catch(function(err){ alert('Erreur : '+err.message); });
+}
+
+function sendInvite(){
+  if(!currentUser||currentUser.role!=='admin') return;
+  var email=document.getElementById('invite-email').value.trim().toLowerCase();
+  var role=document.getElementById('invite-role').value;
+  var errEl=document.getElementById('invite-err');
+  errEl.innerText='';
+  if(!email||email.indexOf('@')<0){errEl.innerText='Adresse email invalide.';return;}
+  db.collection('invites').doc(email).set({role:role,invitedBy:currentUser.email,invitedAt:new Date().toISOString()}).then(function(){
+    document.getElementById('invite-email').value='';
+    renderPendingInvites();
+  }).catch(function(err){ errEl.innerText='Erreur : '+err.message; });
+}
+
+function renderPendingInvites(){
+  var cont=document.getElementById('invites-list');
+  if(!cont) return;
+  cont.innerHTML='<p class="text-xs text-gray-400 italic">Chargement...</p>';
+  db.collection('invites').get().then(function(snap){
+    if(snap.empty){cont.innerHTML='<p class="text-xs text-gray-400 italic">Aucune invitation en attente.</p>';return;}
+    var roleLabels={admin:'Admin',editor:'Éditeur',readOnly:'Lecture seule'};
+    // On ne liste que les invitations pas encore transformees en compte actif
+    db.collection('roles').get().then(function(rolesSnap){
+      var registeredEmails=[];
+      rolesSnap.forEach(function(d){registeredEmails.push(d.data().email);});
+      cont.innerHTML='';
+      var any=false;
+      snap.forEach(function(doc){
+        if(registeredEmails.indexOf(doc.id)>=0) return; // deja inscrit, plus la peine de l'afficher ici
+        any=true;
+        var inv=doc.data();
+        var div=document.createElement('div');
+        div.className='flex items-center justify-between bg-yellow-50 rounded-lg p-2 text-xs';
+        div.innerHTML='<div><span class="font-bold">'+doc.id+'</span> <span class="text-gray-400">('+(roleLabels[inv.role]||inv.role)+', en attente d\'inscription)</span></div>'+
+          '<button onclick="revokeInvite(\''+doc.id+'\')" class="text-red-400 hover:text-red-600 font-bold">✕</button>';
+        cont.appendChild(div);
+      });
+      if(!any) cont.innerHTML='<p class="text-xs text-gray-400 italic">Aucune invitation en attente.</p>';
+    });
+  }).catch(function(err){
+    cont.innerHTML='<p class="text-xs text-red-500">Erreur : '+err.message+'</p>';
+  });
+}
+function revokeInvite(email){
+  if(!confirm("Annuler l'invitation pour "+email+" ?")) return;
+  db.collection('invites').doc(email).delete().then(function(){ renderPendingInvites(); });
 }
 
 // =================================================
