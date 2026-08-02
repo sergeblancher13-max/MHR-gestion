@@ -26,6 +26,10 @@
   var fbAuth = firebase.auth();
   var db = firebase.firestore();
   db.settings({ experimentalAutoDetectLongPolling: true, useFetchStreams: false });
+  // App Firebase secondaire : permet à l'admin de créer un compte pour quelqu'un d'autre
+  // sans se déconnecter lui-même (Firebase Auth ne gère qu'une session par app).
+  var fbSecondaryApp = firebase.initializeApp(firebaseConfig, 'Secondary');
+  var fbSecondaryAuth = fbSecondaryApp.auth();
   var ADMIN_BOOTSTRAP_EMAIL = "serge.blancher@pierrerouge.com";
 </script>
 <style>
@@ -68,6 +72,9 @@ h1,h2,h3,.font-black,#tab-title{font-family:"Oswald","Segoe UI",sans-serif;}
 .pg-vacances{background:#bfdbfe!important;color:#1e40af!important;}
 .pg-match{background:#003366!important;color:#fff!important;}
 .pg-ferie{background:#1f2937!important;color:#fff!important;}
+.pg-amical{background:#f9a8d4!important;color:#831843!important;}
+.pg-stage{background:#5eead4!important;color:#134e4a!important;}
+.pg-integration{background:#a3e635!important;color:#365314!important;}
 /* planning text input mode */
 .pcell-editable{cursor:text!important;}
 .pcell-text-input{width:100%;height:100%;background:transparent;border:none;outline:none;text-align:center;font-size:9px;color:inherit;font-weight:700;}
@@ -288,23 +295,48 @@ button{font-family:"Barlow",sans-serif;}
 
 <!-- MODAL GESTION UTILISATEURS -->
 <div id="modal-users" class="modal-overlay" onclick="closeModalIfOverlay(event)">
-  <div class="modal-box" style="max-width:520px">
+  <div class="modal-box" style="max-width:560px">
     <h3 class="text-base font-black text-mhr mb-4 uppercase">Gestion des Utilisateurs</h3>
-    <p class="text-xs text-gray-400 mb-4">Personne ne peut consulter ou modifier les données sans avoir été invité par un administrateur.</p>
+    <p class="text-xs text-gray-400 mb-4">Personne ne peut consulter ou modifier les données sans un accès accordé par un administrateur.</p>
 
-    <div id="invite-form-section" class="mb-4 p-3 bg-blue-50 rounded-xl">
-      <p class="text-xs font-black text-mhr mb-2 uppercase">Inviter un collaborateur</p>
-      <div class="flex gap-2 flex-wrap items-center">
-        <input type="email" id="invite-email" placeholder="email@exemple.com" class="border rounded-lg p-2 text-xs flex-1 min-w-[160px]">
-        <select id="invite-role" class="border rounded-lg p-2 text-xs">
-          <option value="readOnly">Lecture seule</option>
-          <option value="editor">Éditeur</option>
-          <option value="admin">Admin</option>
-        </select>
-        <button onclick="sendInvite()" class="btn btn-accent btn-sm"><i class="fas fa-paper-plane"></i>Inviter</button>
+    <div id="admin-tools-section">
+      <div class="flex gap-2 mb-3">
+        <button onclick="setUserAddMode('invite')" id="uam-btn-invite" class="flex-1 py-1.5 rounded-lg text-xs font-bold" style="background:var(--mhr);color:#fff">Inviter (la personne crée son compte)</button>
+        <button onclick="setUserAddMode('direct')" id="uam-btn-direct" class="flex-1 py-1.5 rounded-lg text-xs font-bold" style="background:#fff;color:#64748b;border:1px solid #e2e8f0">Créer directement</button>
       </div>
-      <div id="invite-err" class="text-red-500 text-xs mt-1 min-h-4"></div>
-      <p class="text-xs text-gray-400 mt-2">La personne pourra ensuite créer son propre compte avec cette adresse email exacte, depuis l'écran de connexion.</p>
+
+      <div id="invite-form-section" class="mb-4 p-3 bg-blue-50 rounded-xl">
+        <p class="text-xs font-black text-mhr mb-2 uppercase">Inviter un collaborateur</p>
+        <div class="flex gap-2 flex-wrap items-center">
+          <input type="email" id="invite-email" placeholder="email@exemple.com" class="border rounded-lg p-2 text-xs flex-1 min-w-[160px]">
+          <select id="invite-role" class="border rounded-lg p-2 text-xs">
+            <option value="readOnly">Lecture seule</option>
+            <option value="editor">Éditeur</option>
+            <option value="admin">Admin</option>
+          </select>
+          <button onclick="sendInvite()" class="btn btn-accent btn-sm"><i class="fas fa-paper-plane"></i>Inviter</button>
+        </div>
+        <div id="invite-err" class="text-red-500 text-xs mt-1 min-h-4"></div>
+        <p class="text-xs text-gray-400 mt-2">La personne crée ensuite son propre compte avec cette adresse email exacte, depuis l'écran de connexion.</p>
+      </div>
+
+      <div id="direct-form-section" class="mb-4 p-3 bg-green-50 rounded-xl hidden">
+        <p class="text-xs font-black text-green-700 mb-2 uppercase">Créer un compte directement</p>
+        <div class="grid grid-cols-2 gap-2">
+          <input type="text" id="direct-name" placeholder="Nom affiché" class="border rounded-lg p-2 text-xs col-span-2">
+          <input type="email" id="direct-email" placeholder="email@exemple.com" class="border rounded-lg p-2 text-xs col-span-2">
+          <input type="text" id="direct-pass" placeholder="Mot de passe provisoire (6 car. min)" class="border rounded-lg p-2 text-xs">
+          <select id="direct-role" class="border rounded-lg p-2 text-xs">
+            <option value="readOnly">Lecture seule</option>
+            <option value="editor">Éditeur</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <button onclick="generateDirectPassword()" type="button" class="text-xs text-green-700 font-bold underline mt-1">Générer un mot de passe</button>
+        <div id="direct-err" class="text-red-500 text-xs mt-1 min-h-4"></div>
+        <button onclick="adminCreateUserDirect()" class="btn btn-success btn-sm mt-1 w-full"><i class="fas fa-user-plus"></i>Créer le compte</button>
+        <p class="text-xs text-gray-400 mt-2">Communique ensuite l'email et le mot de passe provisoire au collaborateur. Il pourra le changer depuis son compte.</p>
+      </div>
     </div>
 
     <div id="pending-invites-section">
@@ -474,7 +506,7 @@ button{font-family:"Barlow",sans-serif;}
 
   <!-- DASHBOARD -->
   <div id="dashboard" class="tab-content">
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
       <div class="kpi-tile">
         <div class="kpi-icon" style="background:rgba(63,191,232,.14);color:#0A1F3D"><i class="fas fa-users"></i></div>
         <div><div class="kpi-label">Effectif</div><div class="kpi-value" id="dash-total">0</div></div>
@@ -490,6 +522,10 @@ button{font-family:"Barlow",sans-serif;}
       <div class="kpi-tile">
         <div class="kpi-icon" style="background:rgba(217,119,6,.12);color:#D97706"><i class="fas fa-bolt"></i></div>
         <div><div class="kpi-label">Adapt. (<span id="dash-nb-a">0</span>)</div><div id="dash-list-a" class="kpi-sub" style="color:#B4530A;font-weight:600"></div></div>
+      </div>
+      <div class="kpi-tile">
+        <div class="kpi-icon" style="background:rgba(147,51,234,.13);color:#7e22ce"><i class="fas fa-id-card"></i></div>
+        <div><div class="kpi-label">Double Licence (<span id="dash-nb-dl">0</span>)</div><div id="dash-list-dl" class="kpi-sub" style="color:#7e22ce;font-weight:600"></div></div>
       </div>
       <div class="kpi-tile">
         <div class="kpi-icon" style="background:rgba(63,191,232,.14);color:#0A1F3D"><i class="fas fa-futbol"></i></div>
@@ -526,6 +562,9 @@ button{font-family:"Barlow",sans-serif;}
         <span class="flex items-center gap-1"><span class="w-3 h-3 rounded pg-vacances inline-block"></span>Vacances joueuses</span>
         <span class="flex items-center gap-1"><span class="w-3 h-3 rounded pg-match inline-block"></span>Match</span>
         <span class="flex items-center gap-1"><span class="w-3 h-3 rounded pg-ferie inline-block"></span>Ferie/Scol.</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded pg-amical inline-block"></span>Match amical</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded pg-stage inline-block"></span>Stage</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded pg-integration inline-block"></span>Intégration</span>
       </div>
       <div class="flex gap-2 mb-2 flex-wrap items-center">
         <span class="text-xs font-bold text-gray-500 mr-1">Type:</span>
@@ -535,6 +574,9 @@ button{font-family:"Barlow",sans-serif;}
         <button onclick="setPgType('vacances')" id="pg-btn-vacances" class="px-3 py-1 rounded text-xs font-bold border-2 border-transparent hover:opacity-80 pg-vacances">🔵 Vacances</button>
         <button onclick="setPgType('match')" id="pg-btn-match" class="px-3 py-1 rounded text-xs font-bold border-2 border-transparent hover:opacity-80 pg-match">Match</button>
         <button onclick="setPgType('ferie')" id="pg-btn-ferie" class="px-3 py-1 rounded text-xs font-bold border-2 border-transparent hover:opacity-80 pg-ferie">Ferie</button>
+        <button onclick="setPgType('amical')" id="pg-btn-amical" class="px-3 py-1 rounded text-xs font-bold border-2 border-transparent hover:opacity-80 pg-amical">Amical</button>
+        <button onclick="setPgType('stage')" id="pg-btn-stage" class="px-3 py-1 rounded text-xs font-bold border-2 border-transparent hover:opacity-80 pg-stage">Stage</button>
+        <button onclick="setPgType('integration')" id="pg-btn-integration" class="px-3 py-1 rounded text-xs font-bold border-2 border-transparent hover:opacity-80 pg-integration">Intégration</button>
         <button onclick="setPgType('')" id="pg-btn-clear" class="px-3 py-1 rounded text-xs font-bold border-2 border-transparent hover:opacity-80 bg-gray-100 text-gray-500">Effacer</button>
       </div>
       <div class="flex gap-2 mb-3 flex-wrap items-center">
@@ -542,9 +584,14 @@ button{font-family:"Barlow",sans-serif;}
         <button onclick="setPgMode('paint')" id="pg-mode-paint" class="px-2 py-1 rounded text-xs font-bold bg-blue-600 text-white border-2 border-blue-700">🎨 Peinture</button>
         <button onclick="setPgMode('text')" id="pg-mode-text" class="px-2 py-1 rounded text-xs font-bold bg-gray-100 text-gray-600 border-2 border-gray-200">✏️ Texte</button>
         <button onclick="setPgMode('merge')" id="pg-mode-merge" class="px-2 py-1 rounded text-xs font-bold bg-gray-100 text-gray-600 border-2 border-gray-200">⊞ Fusion</button>
+        <span id="pg-merge-dir-wrap" class="hidden gap-1 items-center">
+          <button onclick="setPgMergeDir('h')" id="pg-merge-dir-h" class="px-2 py-1 rounded text-xs font-bold bg-purple-600 text-white">↔ Horizontale</button>
+          <button onclick="setPgMergeDir('v')" id="pg-merge-dir-v" class="px-2 py-1 rounded text-xs font-bold bg-gray-100 text-gray-600">↕ Verticale</button>
+        </span>
         <span id="pg-mode-hint" class="text-xs text-gray-400 italic ml-2">Clic=couleur | Dbl-clic=semaine | Clic-droit=effacer</span>
       </div>
-      <div id="pg-merge-hint" class="hidden text-xs text-purple-700 font-bold mb-2 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-200">⊞ Mode Fusion actif — Cliquez sur une 1ère cellule puis une 2e adjacente (meme ligne) pour les fusionner. Clic-droit sur cellule fusionnee = defusionner.</div>
+      <p class="text-xs text-gray-400 italic mb-2">Les week-ends sont maintenant éditables comme les autres jours (matchs, stages, intégrations...).</p>
+      <div id="pg-merge-hint" class="hidden text-xs text-purple-700 font-bold mb-2 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-200">⊞ Mode Fusion actif — Cliquez sur une 1ère cellule puis une 2e adjacente pour les fusionner. Clic-droit sur cellule fusionnee = defusionner.</div>
       <div class="overflow-x-auto"><div id="planning-grid" class="pgrid-v" style="min-width:300px"></div></div>
     </div>
   </div>
@@ -600,6 +647,13 @@ button{font-family:"Barlow",sans-serif;}
       <div class="bg-white p-4 rounded-xl shadow-sm">
         <h4 class="font-black text-mhr mb-3 border-b pb-2 uppercase text-xs">Saisir un Match</h4>
         <div class="space-y-2 text-xs">
+          <div><label class="block font-bold text-gray-400 mb-0.5">Type de match</label>
+            <div class="flex gap-2">
+              <button type="button" id="m-type-champ" onclick="setMatchType('champ')" class="flex-1 py-1.5 rounded-lg text-xs font-bold border-2" style="border-color:var(--mhr);background:var(--mhr);color:#fff">Championnat</button>
+              <button type="button" id="m-type-amical" onclick="setMatchType('amical')" class="flex-1 py-1.5 rounded-lg text-xs font-bold border-2" style="border-color:#e2e8f0;background:#fff;color:#64748b">Amical</button>
+            </div>
+          </div>
+          <div id="m-champ-fields">
           <div><label class="block font-bold text-gray-400 mb-0.5">Date</label><input type="date" id="m-date" class="w-full border rounded-lg p-1.5"></div>
           <div><label class="block font-bold text-gray-400 mb-0.5">Adversaire</label><input type="text" id="m-adv" class="w-full border rounded-lg p-1.5"></div>
           <div><label class="block font-bold text-gray-400 mb-0.5">Journee (J1-J18)</label>
@@ -618,6 +672,7 @@ button{font-family:"Barlow",sans-serif;}
             <div><label class="block font-bold text-gray-400 mb-0.5">Score Pour</label><input type="number" id="m-sp" min="0" class="w-full border rounded-lg p-1.5" placeholder="0"></div>
             <div><label class="block font-bold text-gray-400 mb-0.5">Score Contre</label><input type="number" id="m-sc" min="0" class="w-full border rounded-lg p-1.5" placeholder="0"></div>
           </div>
+          <div id="m-champ-only-fields">
           <div><label class="block font-bold text-gray-400 mb-0.5">Points terrain (1/2/4/5)</label>
             <select id="m-pts-terrain" class="w-full border rounded-lg p-1.5">
               <option value="0">-- Choisir --</option>
@@ -629,9 +684,11 @@ button{font-family:"Barlow",sans-serif;}
           </div>
           <div><label class="block font-bold text-gray-400 mb-0.5">Classement apres ce match</label>
             <input type="number" id="m-classement" min="1" max="10" class="w-full border rounded-lg p-1.5" placeholder="1 a 10"></div>
+          </div>
           <div class="grid grid-cols-2 gap-2">
             <div><label class="block font-bold text-gray-400 mb-0.5">Essais Marques</label><input type="number" id="m-em" min="0" class="w-full border rounded-lg p-1.5" placeholder="0"></div>
             <div><label class="block font-bold text-gray-400 mb-0.5">Essais Encaisses</label><input type="number" id="m-ee" min="0" class="w-full border rounded-lg p-1.5" placeholder="0"></div>
+          </div>
           </div>
           <button onclick="openModalCompo()" class="w-full bg-blue-50 text-blue-700 font-bold py-1.5 rounded-xl border border-blue-200 hover:bg-blue-100 text-xs"><i class="fas fa-users mr-1"></i>Composition + Stats Indiv.</button>
           <button onclick="saveMatch()" class="w-full bg-mhr text-white font-bold py-2 rounded-xl hover:bg-blue-800 uppercase text-xs"><i class="fas fa-save mr-1"></i>Enregistrer</button>
@@ -661,6 +718,7 @@ button{font-family:"Barlow",sans-serif;}
         <span class="att-A px-3 py-1 rounded-full">A=Absente</span>
         <span class="att-B px-3 py-1 rounded-full">B=Blessee</span>
         <span class="att-E px-3 py-1 rounded-full">E=Excusee</span>
+        <span class="text-gray-400 font-normal text-xs">Jours d'entraînement : Mardi, Mercredi, Vendredi · Saison du 18 août au 15 juin</span>
         <div class="ml-auto flex gap-2 items-center">
           <button onclick="prevPresMonth()" class="px-2 py-1 rounded border text-xs hover:bg-gray-100"><i class="fas fa-chevron-left"></i></button>
           <span id="pres-month-label" class="px-3 py-1 font-black text-mhr text-sm"></span>
@@ -802,6 +860,29 @@ button{font-family:"Barlow",sans-serif;}
               <input type="date" id="p-reprise" class="w-full border rounded-lg p-1.5 bg-white" onchange="updateProfile()">
             </div>
             <div id="med-status-auto" class="rounded-lg p-2 text-xs font-bold text-center hidden"></div>
+            <button id="btn-archive-med" onclick="archiveMedical()" class="hidden w-full btn btn-success btn-sm"><i class="fas fa-box-archive"></i>Archiver cette blessure (reprise confirmée)</button>
+          </div>
+          <div class="mt-3 pt-3 border-t border-red-100">
+            <h5 class="font-bold text-red-700 mb-1.5 uppercase text-xs">Historique de la saison</h5>
+            <div id="med-history-list" class="space-y-1.5 text-xs max-h-40 overflow-y-auto"></div>
+          </div>
+        </div>
+        <!-- Double Licence -->
+        <div class="bg-purple-50 p-3 rounded-xl border border-purple-100">
+          <h4 class="font-bold text-purple-700 mb-2 uppercase text-xs"><i class="fas fa-id-card mr-1"></i>Double Licence</h4>
+          <label class="flex items-center gap-2 text-xs font-bold text-gray-600 mb-2">
+            <input type="checkbox" id="p-dl-active" onchange="updateProfile()"> Joueuse en double licence
+          </label>
+          <div id="dl-fields" class="space-y-2 text-xs hidden">
+            <div><label class="font-bold text-gray-400 block mb-0.5">Club partenaire</label>
+              <input type="text" id="p-dl-club" placeholder="Nom du club" class="w-full border rounded-lg p-1.5 bg-white" onchange="updateProfile()">
+            </div>
+            <div><label class="font-bold text-gray-400 block mb-0.5">Sens</label>
+              <select id="p-dl-sens" class="w-full border rounded-lg p-1.5 bg-white" onchange="updateProfile()">
+                <option value="entrante">Entrante (vient d'un autre club)</option>
+                <option value="sortante">Sortante (part vers un autre club)</option>
+              </select>
+            </div>
           </div>
         </div>
         <!-- Stats jeu -->
@@ -877,8 +958,8 @@ button{font-family:"Barlow",sans-serif;}
   </div>
 
   </div><!-- /profil -->
-  <div id="match-live" class="tab-content hidden">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <div id="match-live" class="tab-content hidden" style="height:calc(100vh - 130px)">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full" style="grid-template-rows:auto 1fr">
       <!-- Scoreboard + chrono -->
       <div class="lg:col-span-3">
         <div class="live-hero p-4 flex flex-wrap gap-4 items-center justify-between">
@@ -927,7 +1008,7 @@ button{font-family:"Barlow",sans-serif;}
         </div>
       </div>
       <!-- Composition + changements -->
-      <div class="lg:col-span-2 bg-white rounded-xl shadow-sm p-4">
+      <div class="lg:col-span-2 bg-white rounded-xl shadow-sm p-4 flex flex-col min-h-0">
         <div class="flex justify-between items-center mb-3">
           <h4 class="font-black text-mhr uppercase text-xs">Composition &amp; Temps de Jeu</h4>
           <div class="flex gap-2">
@@ -942,17 +1023,21 @@ button{font-family:"Barlow",sans-serif;}
           <button onclick="liveAddToCompo('Remplacante')" class="btn btn-ghost btn-sm">+ Banc</button>
         </div>
         <!-- 2 colonnes: titulaires / remplacantes -->
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <div class="text-xs font-black uppercase mb-2 px-2 py-1 rounded" style="background:#E6F7EF;color:#0E7A4C">🟢 Sur le terrain</div>
-            <div id="live-titulaires" class="space-y-1"></div>
+        <div class="grid grid-cols-2 gap-3 flex-1 min-h-0" style="overflow:hidden">
+          <div class="flex flex-col min-h-0">
+            <div class="text-xs font-black uppercase mb-2 px-2 py-1 rounded flex justify-between items-center" style="background:#E6F7EF;color:#0E7A4C">
+              <span>🟢 XV de départ</span><span id="live-tit-count">0/15</span>
+            </div>
+            <div id="live-titulaires" class="space-y-1 overflow-y-auto flex-1"></div>
           </div>
-          <div>
-            <div class="text-xs font-black uppercase mb-2 px-2 py-1 rounded" style="background:#FEF3E6;color:#B4530A">🟠 Banc</div>
-            <div id="live-remplacantes" class="space-y-1"></div>
+          <div class="flex flex-col min-h-0">
+            <div class="text-xs font-black uppercase mb-2 px-2 py-1 rounded flex justify-between items-center" style="background:#FEF3E6;color:#B4530A">
+              <span>🟠 Banc</span><span id="live-rem-count">0/8</span>
+            </div>
+            <div id="live-remplacantes" class="space-y-1 overflow-y-auto flex-1"></div>
           </div>
         </div>
-        <div class="mt-3 border-t pt-3">
+        <div class="mt-3 border-t pt-3 shrink-0">
           <p class="text-xs text-gray-400 font-bold mb-2">FAIRE UN CHANGEMENT :</p>
           <div class="flex gap-2 flex-wrap items-center text-xs">
             <label class="text-gray-500 font-bold">Sortante :</label>
@@ -963,15 +1048,15 @@ button{font-family:"Barlow",sans-serif;}
             <button onclick="liveDoChange()" class="btn btn-primary btn-sm"><i class="fas fa-exchange-alt"></i>Effectuer</button>
           </div>
         </div>
-        <div class="mt-2 text-xs text-gray-400 font-bold">Changements effectués : <span id="live-change-count" class="text-mhr font-black">0</span>/8</div>
+        <div class="mt-2 text-xs text-gray-400 font-bold shrink-0">Changements effectués : <span id="live-change-count" class="text-mhr font-black">0</span>/8</div>
       </div>
       <!-- Fil des evenements -->
-      <div class="bg-white rounded-xl shadow-sm p-4 flex flex-col">
+      <div class="bg-white rounded-xl shadow-sm p-4 flex flex-col min-h-0">
         <div class="flex justify-between items-center mb-3">
           <h4 class="font-black text-mhr uppercase text-xs">Fil du match</h4>
           <button onclick="liveAddFreeEvent()" class="btn btn-ghost btn-sm"><i class="fas fa-plus"></i>Note libre</button>
         </div>
-        <div id="live-events-list" class="space-y-1.5 flex-1 overflow-y-auto max-h-96"></div>
+        <div id="live-events-list" class="space-y-1.5 flex-1 overflow-y-auto"></div>
       </div>
     </div>
   </div>
@@ -1066,6 +1151,9 @@ button{font-family:"Barlow",sans-serif;}
     <input type="hidden" id="edit-mid">
     <div class="grid grid-cols-2 gap-3 text-xs">
       <div class="col-span-2"><label class="font-bold text-gray-400 block mb-0.5">Adversaire</label><input type="text" id="edit-adv" class="w-full border rounded-lg p-2"></div>
+      <div class="col-span-2"><label class="font-bold text-gray-400 block mb-0.5">Type de match</label>
+        <select id="edit-type" class="w-full border rounded-lg p-2"><option value="champ">Championnat</option><option value="amical">Amical</option></select>
+      </div>
       <div><label class="font-bold text-gray-400 block mb-0.5">Date</label><input type="date" id="edit-date" class="w-full border rounded-lg p-2"></div>
       <div><label class="font-bold text-gray-400 block mb-0.5">Journee</label>
         <select id="edit-journee" class="w-full border rounded-lg p-2">
@@ -1396,6 +1484,10 @@ function normalizeEq(eq){
     if(!j.dateBlessure) j.dateBlessure='';
     if(!j.repriseAdapt) j.repriseAdapt='';
     if(!j.sharedTeams) j.sharedTeams=[]; // equipes où la joueuse est convocable
+    if(!j.medicalHistory) j.medicalHistory=[]; // blessures archivees (saison)
+    if(j.dlActive===undefined) j.dlActive=false;
+    if(!j.dlClub) j.dlClub='';
+    if(!j.dlSens) j.dlSens='entrante';
   });
   eq.matchs.forEach(function(m){if(!m.compo) m.compo={};});
   return eq;
@@ -1596,6 +1688,7 @@ function updateDashCounts(){
   var j=eq().joueurs;
   var bl=j.filter(function(x){return x.statut==='Blessee';});
   var ad=j.filter(function(x){return x.statut==='Adapte';});
+  var dl=j.filter(function(x){return x.dlActive;});
   var dispo=j.filter(function(x){return x.statut==='Disponible';}).length;
   document.getElementById('dash-total').innerText=j.length;
   document.getElementById('dash-dispo').innerText=dispo;
@@ -1603,6 +1696,11 @@ function updateDashCounts(){
   document.getElementById('dash-nb-a').innerText=ad.length;
   document.getElementById('dash-list-b').innerHTML=bl.map(function(x){return '<span class="bbl">'+x.nom+'</span>';}).join('');
   document.getElementById('dash-list-a').innerHTML=ad.map(function(x){return '<span style="display:inline-flex;align-items:center;gap:3px;background:#fff7ed;color:#9a3412;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:700;margin:1px">'+x.nom+'</span>';}).join('');
+  document.getElementById('dash-nb-dl').innerText=dl.length;
+  document.getElementById('dash-list-dl').innerHTML=dl.map(function(x){
+    var arrow=x.dlSens==='sortante'?'→':'←';
+    return '<span style="display:inline-flex;align-items:center;gap:3px;background:#f3e8ff;color:#7e22ce;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:700;margin:1px" title="'+(x.dlClub||'')+'">'+x.nom+' '+arrow+' '+(x.dlClub||'?')+'</span>';
+  }).join('');
   document.getElementById('dash-nb-matchs').innerText=eq().matchs.length;
 }
 
@@ -1708,7 +1806,8 @@ function renderEffectif(){
     }).join('');
     var tr=document.createElement('tr');
     tr.className='hover:bg-gray-50';
-    tr.innerHTML='<td class="p-3 font-bold">'+j.nom+'</td>'+
+    var dlBadge=j.dlActive?'<span class="ml-1 px-1.5 py-0.5 rounded text-xs font-bold" style="background:#f3e8ff;color:#7e22ce;font-size:9px" title="Double licence '+(j.dlSens||'')+' — '+(j.dlClub||'')+'">DL '+(j.dlSens==='sortante'?'→':'←')+'</span>':'';
+    tr.innerHTML='<td class="p-3 font-bold">'+j.nom+dlBadge+'</td>'+
       '<td class="p-3 text-xs text-gray-500">'+j.poste+'</td>'+
       '<td class="p-3 text-xs text-gray-400">'+(j.numero||'--')+'</td>'+
       '<td class="p-3"><select onchange="changeStatutEffectif('+j.id+',this.value)" class="text-xs font-bold px-2 py-1 rounded-full border-0 cursor-pointer '+sc+'" style="outline:none">'+
@@ -1883,6 +1982,11 @@ function openProfil(id){
   document.getElementById('p-date-blessure').value=j.dateBlessure||'';
   document.getElementById('p-reprise-adapt').value=j.repriseAdapt||'';
   document.getElementById('p-reprise').value=j.reprise||'';
+  document.getElementById('p-dl-active').checked=!!j.dlActive;
+  document.getElementById('p-dl-club').value=j.dlClub||'';
+  document.getElementById('p-dl-sens').value=j.dlSens||'entrante';
+  document.getElementById('dl-fields').classList.toggle('hidden',!j.dlActive);
+  renderMedicalHistory(j);
   document.getElementById('p-taille').value=j.taille||'';
   document.getElementById('p-taille2').value=j.taille||'';
   document.getElementById('p-v20').value=j.v20||'';
@@ -2042,6 +2146,10 @@ function updateProfile(){
   j.dateBlessure=document.getElementById('p-date-blessure').value;
   j.repriseAdapt=document.getElementById('p-reprise-adapt').value;
   j.reprise=document.getElementById('p-reprise').value;
+  j.dlActive=document.getElementById('p-dl-active').checked;
+  j.dlClub=document.getElementById('p-dl-club').value.trim();
+  j.dlSens=document.getElementById('p-dl-sens').value;
+  document.getElementById('dl-fields').classList.toggle('hidden',!j.dlActive);
   j.taille=parseInt(document.getElementById('p-taille').value)||0;
   j.v20=parseFloat(document.getElementById('p-v20').value)||0;
   j.v40=parseFloat(document.getElementById('p-v40').value)||0;
@@ -2052,6 +2160,7 @@ function updateProfile(){
   // Auto-status from medical dates
   var today=toISO(new Date());
   var medBox=document.getElementById('med-status-auto');
+  var archiveBtn=document.getElementById('btn-archive-med');
   if(j.med){
     var repTot=j.reprise, repAd=j.repriseAdapt;
     if(repTot && today>=repTot){
@@ -2072,8 +2181,10 @@ function updateProfile(){
       medBox.innerText='🚑 Blessee'+joursRest;
       medBox.classList.remove('hidden');
     }
+    archiveBtn.classList.toggle('hidden',!repTot);
   } else {
     medBox.classList.add('hidden');
+    archiveBtn.classList.add('hidden');
     // Only override if no manual statut change
     if(j.statut==='Blessee'||j.statut==='Adapte') j.statut='Disponible';
   }
@@ -2085,6 +2196,45 @@ function updateProfile(){
   badge.className='inline-block px-3 py-1 rounded-full text-xs font-bold '+(j.statut==='Blessee'?'bg-red-500 text-white':j.statut==='Adapte'?'bg-orange-500 text-white':j.statut==='Suspendue'?'bg-purple-500 text-white':'bg-green-500 text-white');
 
   document.getElementById('p-poste-lbl').innerText=j.poste;
+  scheduleSave();
+}
+function archiveMedical(){
+  var j=eq().joueurs.find(function(x){return x.id===window.activePlayerId;});
+  if(!j||!j.med) return;
+  if(!confirm('Archiver cette blessure dans l\'historique et repartir sur un dossier medical vierge ?')) return;
+  j.medicalHistory.unshift({
+    type:j.med, dateBlessure:j.dateBlessure||'', repriseAdapt:j.repriseAdapt||'', reprise:j.reprise||''
+  });
+  j.med=''; j.dateBlessure=''; j.repriseAdapt=''; j.reprise=''; j.statut='Disponible';
+  document.getElementById('p-med').value='';
+  document.getElementById('p-date-blessure').value='';
+  document.getElementById('p-reprise-adapt').value='';
+  document.getElementById('p-reprise').value='';
+  updateProfile();
+  renderMedicalHistory(j);
+  scheduleSave();
+}
+function renderMedicalHistory(j){
+  var cont=document.getElementById('med-history-list');
+  if(!cont) return;
+  if(!j.medicalHistory||!j.medicalHistory.length){
+    cont.innerHTML='<p class="text-gray-400 italic">Aucune blessure archivée cette saison.</p>';
+    return;
+  }
+  cont.innerHTML=j.medicalHistory.map(function(h,i){
+    return '<div class="bg-white rounded-lg p-2 border border-red-100 flex justify-between items-start">'+
+      '<div><span class="font-bold text-gray-700">'+h.type+'</span><br>'+
+      '<span class="text-gray-400">Blessure: '+(fmtDate(h.dateBlessure)||'--')+' · Adapt: '+(fmtDate(h.repriseAdapt)||'--')+' · Totale: '+(fmtDate(h.reprise)||'--')+'</span></div>'+
+      '<button onclick="deleteMedicalHistory('+i+')" class="text-red-300 hover:text-red-500 font-bold px-1">✕</button>'+
+      '</div>';
+  }).join('');
+}
+function deleteMedicalHistory(idx){
+  var j=eq().joueurs.find(function(x){return x.id===window.activePlayerId;});
+  if(!j) return;
+  if(!confirm('Supprimer cette entrée de l\'historique ?')) return;
+  j.medicalHistory.splice(idx,1);
+  renderMedicalHistory(j);
   scheduleSave();
 }
 function updateProfileTaille(){
@@ -2265,16 +2415,37 @@ function getCompoData(){
   });
   return c;
 }
+var currentMatchType='champ';
+function setMatchType(type){
+  currentMatchType=type;
+  var bChamp=document.getElementById('m-type-champ'), bAmical=document.getElementById('m-type-amical');
+  var champOnly=document.getElementById('m-champ-only-fields');
+  var jSel=document.getElementById('m-journee');
+  if(type==='champ'){
+    bChamp.style.background='var(--mhr)';bChamp.style.borderColor='var(--mhr)';bChamp.style.color='#fff';
+    bAmical.style.background='#fff';bAmical.style.borderColor='#e2e8f0';bAmical.style.color='#64748b';
+    champOnly.classList.remove('hidden');
+    jSel.closest('div').classList.remove('hidden');
+  } else {
+    bAmical.style.background='#7c3aed';bAmical.style.borderColor='#7c3aed';bAmical.style.color='#fff';
+    bChamp.style.background='#fff';bChamp.style.borderColor='#e2e8f0';bChamp.style.color='#64748b';
+    champOnly.classList.add('hidden');
+    jSel.value='';
+    jSel.closest('div').classList.add('hidden');
+  }
+}
 function saveMatch(){
   var adv=document.getElementById('m-adv').value.trim();
   if(!adv){alert("Adversaire obligatoire.");return;}
   var sp=parseInt(document.getElementById('m-sp').value)||0;
   var sc=parseInt(document.getElementById('m-sc').value)||0;
-  var ptsT=parseInt(document.getElementById('m-pts-terrain').value)||0;
-  var cl=parseInt(document.getElementById('m-classement').value)||null;
+  var isAmical=currentMatchType==='amical';
+  var ptsT=isAmical?0:(parseInt(document.getElementById('m-pts-terrain').value)||0);
+  var cl=isAmical?null:(parseInt(document.getElementById('m-classement').value)||null);
   var m={id:Date.now(),date:document.getElementById('m-date').value||toISO(new Date()),
     adv:adv,lieu:document.getElementById('m-lieu').value,
-    journee:document.getElementById('m-journee').value||'',
+    type:currentMatchType,
+    journee:isAmical?'':(document.getElementById('m-journee').value||''),
     scoreP:sp,scoreC:sc,victoire:sp>sc,ptsT:ptsT,classement:cl,
     em:parseInt(document.getElementById('m-em').value)||0,
     ee:parseInt(document.getElementById('m-ee').value)||0,
@@ -2283,6 +2454,7 @@ function saveMatch(){
   ['m-adv','m-sp','m-sc','m-em','m-ee','m-date','m-classement'].forEach(function(id){document.getElementById(id).value='';});
   document.getElementById('m-journee').value='';document.getElementById('m-pts-terrain').value='0';
   pendingCompo={};
+  setMatchType('champ');
   save();renderMatchHistory();
 }
 function deleteMatch(id){
@@ -2295,6 +2467,7 @@ function openEditMatch(id){
   if(!m) return;
   document.getElementById('edit-mid').value=id;
   document.getElementById('edit-adv').value=m.adv||'';
+  document.getElementById('edit-type').value=m.type||'champ';
   document.getElementById('edit-date').value=m.date||'';
   document.getElementById('edit-journee').value=m.journee||'';
   document.getElementById('edit-sp').value=m.scoreP||0;
@@ -2312,6 +2485,7 @@ function confirmEditMatch(){
   var sp=parseInt(document.getElementById('edit-sp').value)||0;
   var sc=parseInt(document.getElementById('edit-sc').value)||0;
   m.adv=document.getElementById('edit-adv').value.trim()||m.adv;
+  m.type=document.getElementById('edit-type').value||'champ';
   m.date=document.getElementById('edit-date').value||m.date;
   m.journee=document.getElementById('edit-journee').value||'';
   m.scoreP=sp;m.scoreC=sc;m.victoire=sp>sc;
@@ -2341,20 +2515,21 @@ function renderMatchHistory(){
   sorted.forEach(function(m){
     var rc=m.victoire?'text-green-700 font-black':'text-red-600 font-bold';
     var nb=Object.keys(m.compo||{}).length;
+    var isAmical=m.type==='amical';
     // Compute team stats from compo
     var totEss=0,totTr=0,totPen=0;
     if(m.compo){Object.values(m.compo).forEach(function(c){
       totEss+=(c.essais||0);totTr+=(c.transfos||0);totPen+=(c.penalites||0);
     });}
     var totPts=totEss*5+totTr*2+totPen*3;
-    var tr=document.createElement('tr'); tr.className='hover:bg-gray-50';
-    tr.innerHTML='<td class="p-2 font-bold">'+(m.journee||'--')+'</td>'+
+    var tr=document.createElement('tr'); tr.className='hover:bg-gray-50'+(isAmical?' bg-purple-50/30':'');
+    tr.innerHTML='<td class="p-2 font-bold">'+(isAmical?'<span class="px-1.5 py-0.5 rounded text-xs font-bold" style="background:#f3e8ff;color:#7c3aed">Amical</span>':(m.journee||'--'))+'</td>'+
       '<td class="p-2">'+fmtDate(m.date)+'</td><td class="p-2 font-bold">'+m.adv+'</td>'+
       '<td class="p-2">'+(m.lieu==='Domicile'?'DOM':'EXT')+'</td>'+
       '<td class="p-2 font-bold">'+m.scoreP+'-'+m.scoreC+'</td>'+
       '<td class="p-2 '+rc+'">'+(m.victoire?'V':'D')+'</td>'+
-      '<td class="p-2 font-bold text-blue-600">'+(m.ptsT||0)+' pts</td>'+
-      '<td class="p-2">'+(m.classement?m.classement+'e':'--')+'</td>'+
+      '<td class="p-2 font-bold text-blue-600">'+(isAmical?'--':(m.ptsT||0)+' pts')+'</td>'+
+      '<td class="p-2">'+(isAmical?'--':(m.classement?m.classement+'e':'--'))+'</td>'+
       '<td class="p-2">'+m.em+'/'+(m.ee||0)+'</td>'+
       '<td class="p-2 text-xs"><span class="text-green-600 font-bold">E:'+totEss+'</span> <span class="text-blue-500">T:'+totTr+'</span> <span class="text-orange-500">P:'+totPen+'</span></td>'+
       '<td class="p-2"><button onclick="viewCompo('+m.id+')" class="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded hover:bg-blue-100 font-bold">'+(nb?nb+'j':'--')+'</button></td>'+
@@ -2418,6 +2593,7 @@ var pgMode='paint'; // 'paint', 'text', 'merge'
 var pgDragging=false;
 var pgDragType='';
 var pgMergeFirst=null; // first cell selected for merge
+var pgMergeDir='h'; // 'h' = horizontale (meme jour, mois adjacents), 'v' = verticale (meme mois, jours adjacents)
 
 function mkCell(text,cls,clickable){
   var d=document.createElement('div');
@@ -2433,21 +2609,35 @@ function setPgType(t){
   if(btn){btn.style.outline='2px solid #fff';btn.style.boxShadow='0 0 0 2px rgba(0,0,0,.3)';}
 }
 
+function setPgMergeDir(d){
+  pgMergeDir=d;
+  pgMergeFirst=null;
+  var bh=document.getElementById('pg-merge-dir-h'), bv=document.getElementById('pg-merge-dir-v');
+  if(d==='h'){bh.className='px-2 py-1 rounded text-xs font-bold bg-purple-600 text-white';bv.className='px-2 py-1 rounded text-xs font-bold bg-gray-100 text-gray-600';}
+  else {bv.className='px-2 py-1 rounded text-xs font-bold bg-purple-600 text-white';bh.className='px-2 py-1 rounded text-xs font-bold bg-gray-100 text-gray-600';}
+  renderPlanning();
+}
+
 function setPgMode(m){
   pgMode=m;
   pgMergeFirst=null;
   document.querySelectorAll('[id^="pg-mode-"]').forEach(function(b){
-    b.className='px-2 py-1 rounded text-xs font-bold bg-gray-100 text-gray-600 border-2 border-gray-200';
+    if(b.id==='pg-mode-hint'||b.id==='pg-mode-paint'||b.id==='pg-mode-text'||b.id==='pg-mode-merge')
+      b.className='px-2 py-1 rounded text-xs font-bold bg-gray-100 text-gray-600 border-2 border-gray-200';
   });
   var activeBtn=document.getElementById('pg-mode-'+m);
   if(activeBtn) activeBtn.className='px-2 py-1 rounded text-xs font-bold bg-blue-600 text-white border-2 border-blue-700';
   var hint=document.getElementById('pg-merge-hint');
   var modeHint=document.getElementById('pg-mode-hint');
+  var dirWrap=document.getElementById('pg-merge-dir-wrap');
   if(m==='merge'){
     hint.classList.remove('hidden');
-    if(modeHint) modeHint.innerText='Cliquez sur 2 cellules adjacentes (meme ligne) pour fusionner';
+    dirWrap.classList.remove('hidden');
+    dirWrap.style.display='inline-flex';
+    if(modeHint) modeHint.innerText=pgMergeDir==='h'?'Cliquez sur 2 cellules adjacentes (meme jour, mois differents) pour fusionner':'Cliquez sur 2 cellules adjacentes (meme mois, jours qui se suivent) pour fusionner';
   } else {
     hint.classList.add('hidden');
+    dirWrap.classList.add('hidden');
     if(modeHint) modeHint.innerText=m==='text'?'Clic=ouvrir editeur texte | Clic-droit=effacer texte':'Clic=couleur | Dbl-clic=semaine | Clic-droit=effacer';
   }
 }
@@ -2455,18 +2645,39 @@ function setPgMode(m){
 // =================================================
 // PRESENCES
 // =================================================
-function prevPresMonth(){presViewDate.setMonth(presViewDate.getMonth()-1);renderPresences();}
-function nextPresMonth(){presViewDate.setMonth(presViewDate.getMonth()+1);renderPresences();}
+function seasonBounds(){
+  var seasonStr=eq().season||'2025-2026';
+  var parts=seasonStr.split('-');
+  var y1=parseInt(parts[0])||new Date().getFullYear();
+  var y2=parseInt(parts[1])||(y1+1);
+  return {start:new Date(y1,7,18), end:new Date(y2,5,15)}; // 18 aout -> 15 juin (mois 0-indexes)
+}
+function isTrainingDay(dt){
+  var dow=dt.getDay()===0?7:dt.getDay();
+  if([2,3,5].indexOf(dow)<0) return false; // mardi, mercredi, vendredi uniquement
+  var b=seasonBounds();
+  return dt>=b.start && dt<=b.end;
+}
+function clampPresViewToSeason(){
+  var b=seasonBounds();
+  var minM=new Date(b.start.getFullYear(),b.start.getMonth(),1);
+  var maxM=new Date(b.end.getFullYear(),b.end.getMonth(),1);
+  if(presViewDate<minM) presViewDate=new Date(minM);
+  if(presViewDate>maxM) presViewDate=new Date(maxM);
+}
+function prevPresMonth(){presViewDate.setMonth(presViewDate.getMonth()-1);clampPresViewToSeason();renderPresences();}
+function nextPresMonth(){presViewDate.setMonth(presViewDate.getMonth()+1);clampPresViewToSeason();renderPresences();}
 function renderPresences(){
+  clampPresViewToSeason();
   document.getElementById('pres-month-label').innerText=MOIS[presViewDate.getMonth()]+' '+presViewDate.getFullYear();
   var yr=presViewDate.getFullYear(),mo=presViewDate.getMonth();
   var dim=new Date(yr,mo+1,0).getDate();
   var table=document.getElementById('presences-table');
   var html='<thead><tr><th class="border p-2 text-left sticky-col text-xs font-bold bg-white" style="min-width:120px">Joueuse</th>';
   for(var d=1;d<=dim;d++){
-    var dt=new Date(yr,mo,d),dow=dt.getDay()===0?7:dt.getDay(),isWE=dow>=6;
+    var dt=new Date(yr,mo,d),dow=dt.getDay()===0?7:dt.getDay(),isTD=isTrainingDay(dt);
     var dn=['','L','Ma','Me','J','V','Sa','Di'][dow];
-    html+='<th class="border text-xs font-bold p-1 text-center" style="min-width:26px;'+(isWE?'background:#f9fafb;color:#9ca3af':'')+'">'+dn+'<br>'+d+'</th>';
+    html+='<th class="border text-xs font-bold p-1 text-center" style="min-width:26px;'+(!isTD?'background:#f9fafb;color:#d1d5db':'')+'">'+dn+'<br>'+d+'</th>';
   }
   html+='</tr></thead><tbody>';
   var dayCounts=[];
@@ -2475,8 +2686,8 @@ function renderPresences(){
     html+='<tr><td class="border p-1.5 text-xs font-semibold sticky-col bg-white" style="min-width:120px">'+j.nom+'</td>';
     for(var d=1;d<=dim;d++){
       var k=yr+'-'+String(mo+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-      var dt=new Date(yr,mo,d),dow=dt.getDay()===0?7:dt.getDay(),isWE=dow>=6;
-      if(isWE){html+='<td class="border text-center" style="background:#f9fafb;min-width:26px"></td>';}
+      var dt=new Date(yr,mo,d);
+      if(!isTrainingDay(dt)){html+='<td class="border text-center" style="background:#f9fafb;min-width:26px"></td>';}
       else{
         var s=j.presences[k]||'P';
         var cls=s==='A'?'att-A':s==='B'?'att-B':s==='E'?'att-E':'att-P';
@@ -2489,8 +2700,8 @@ function renderPresences(){
   // Total presentes row
   html+='<tr style="background:#eff6ff;border-top:2px solid #003366"><td class="border p-1.5 text-xs font-black sticky-col" style="color:#003366;background:#eff6ff">Total Presentes</td>';
   for(var d=1;d<=dim;d++){
-    var dt=new Date(yr,mo,d),dow=dt.getDay()===0?7:dt.getDay(),isWE=dow>=6;
-    if(isWE){html+='<td class="border" style="background:#f9fafb;min-width:26px"></td>';}
+    var dt=new Date(yr,mo,d);
+    if(!isTrainingDay(dt)){html+='<td class="border" style="background:#f9fafb;min-width:26px"></td>';}
     else{
       var cnt=dayCounts[d-1],nb=cnt.P,tot=cnt.P+cnt.A+cnt.B+cnt.E,pct=tot>0?Math.round(nb/tot*100):0;
       var col=pct>=80?'#15803d':pct>=60?'#d97706':'#dc2626';
@@ -2501,8 +2712,8 @@ function renderPresences(){
   // Absent row
   html+='<tr style="background:#fff8f8"><td class="border p-1.5 text-xs font-bold sticky-col" style="color:#ef4444;background:#fff8f8">Abs/Bles/Exc</td>';
   for(var d=1;d<=dim;d++){
-    var dt=new Date(yr,mo,d),dow=dt.getDay()===0?7:dt.getDay(),isWE=dow>=6;
-    if(isWE){html+='<td class="border" style="background:#f9fafb;min-width:26px"></td>';}
+    var dt=new Date(yr,mo,d);
+    if(!isTrainingDay(dt)){html+='<td class="border" style="background:#f9fafb;min-width:26px"></td>';}
     else{var cnt=dayCounts[d-1],nb=cnt.A+cnt.B+cnt.E;html+='<td class="border text-center" style="font-size:9px;font-weight:700;color:'+(nb>0?'#dc2626':'#9ca3af')+'">'+nb+'</td>';}
   }
   html+='</tr></tbody>';
@@ -3056,6 +3267,13 @@ function tryLoadUserRole(user,attempt){
       return;
     }
     var roleData=doc.data();
+    if(roleData.disabled){
+      document.getElementById('login-screen').style.display='flex';
+      document.getElementById('app-main').style.display='none';
+      document.getElementById('login-err').innerText="Ce compte a été suspendu par l'administrateur.";
+      fbAuth.signOut();
+      return;
+    }
     currentUser={uid:user.uid,email:user.email,name:roleData.name||user.email,role:roleData.role||'readOnly'};
     document.getElementById('login-err').innerText='';
     document.getElementById('login-screen').style.display='none';
@@ -3106,10 +3324,55 @@ function renderUsersList(){
   var isAdmin=currentUser&&currentUser.role==='admin';
   renderActiveAccounts();
   if(isAdmin) renderPendingInvites();
-  var inviteSection=document.getElementById('invite-form-section');
-  if(inviteSection) inviteSection.style.display=isAdmin?'block':'none';
+  var toolsSection=document.getElementById('admin-tools-section');
+  if(toolsSection) toolsSection.style.display=isAdmin?'block':'none';
   var pendingSection=document.getElementById('pending-invites-section');
   if(pendingSection) pendingSection.style.display=isAdmin?'block':'none';
+  if(isAdmin) setUserAddMode('invite');
+}
+
+function setUserAddMode(mode){
+  var bInv=document.getElementById('uam-btn-invite'), bDir=document.getElementById('uam-btn-direct');
+  var sInv=document.getElementById('invite-form-section'), sDir=document.getElementById('direct-form-section');
+  if(mode==='invite'){
+    bInv.style.background='var(--mhr)';bInv.style.color='#fff';
+    bDir.style.background='#fff';bDir.style.color='#64748b';
+    sInv.classList.remove('hidden');sDir.classList.add('hidden');
+  } else {
+    bDir.style.background='#0E9F6E';bDir.style.color='#fff';
+    bInv.style.background='#fff';bInv.style.color='#64748b';
+    sDir.classList.remove('hidden');sInv.classList.add('hidden');
+  }
+}
+
+function generateDirectPassword(){
+  var chars='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  var pass='';
+  for(var i=0;i<10;i++) pass+=chars.charAt(Math.floor(Math.random()*chars.length));
+  document.getElementById('direct-pass').value=pass;
+}
+
+function adminCreateUserDirect(){
+  if(!currentUser||currentUser.role!=='admin') return;
+  var name=document.getElementById('direct-name').value.trim();
+  var email=document.getElementById('direct-email').value.trim().toLowerCase();
+  var pass=document.getElementById('direct-pass').value;
+  var role=document.getElementById('direct-role').value;
+  var errEl=document.getElementById('direct-err');
+  errEl.innerText='';
+  if(!name){errEl.innerText='Indique un nom.';return;}
+  if(!email||email.indexOf('@')<0){errEl.innerText='Email invalide.';return;}
+  if(!pass||pass.length<6){errEl.innerText='Mot de passe : 6 caractères minimum.';return;}
+  fbSecondaryAuth.createUserWithEmailAndPassword(email,pass).then(function(cred){
+    var newUid=cred.user.uid;
+    return db.collection('roles').doc(newUid).set({email:email,name:name,role:role}).then(function(){
+      return fbSecondaryAuth.signOut();
+    });
+  }).then(function(){
+    ['direct-name','direct-email','direct-pass'].forEach(function(id){document.getElementById(id).value='';});
+    alert('Compte créé pour '+name+' ('+email+').\n\nCommunique-lui ces identifiants :\nEmail : '+email+'\nMot de passe provisoire : '+pass);
+    renderActiveAccounts();
+  }).catch(function(err){ errEl.innerText=translateFirebaseError(err); });
 }
 
 function renderActiveAccounts(){
@@ -3126,16 +3389,23 @@ function renderActiveAccounts(){
     snap.forEach(function(doc){
       var u=doc.data();
       var uid=doc.id;
+      var isDisabled=!!u.disabled;
       var div=document.createElement('div');
-      div.className='flex items-center justify-between bg-gray-50 rounded-lg p-2 text-xs gap-2';
+      div.className='flex items-center justify-between bg-gray-50 rounded-lg p-2 text-xs gap-2'+(isDisabled?' opacity-60':'');
       var isSelf=currentUser&&uid===currentUser.uid;
       var selectHtml=isAdmin?
         '<select onchange="changeUserRole(\''+uid+'\',this.value)" class="text-xs font-bold border rounded px-1 py-0.5" '+(isSelf?'disabled title="Tu ne peux pas changer ton propre rôle"':'')+'>'+
           ['admin','editor','readOnly'].map(function(r){return '<option value="'+r+'"'+(u.role===r?' selected':'')+'>'+roleLabels[r]+'</option>';}).join('')+
         '</select>' :
         '<span class="px-2 py-0.5 rounded-full text-xs '+(roleColors[u.role]||roleColors.readOnly)+'">'+(roleLabels[u.role]||u.role)+'</span>';
-      var delBtn=(isAdmin&&!isSelf)?'<button onclick="revokeUserAccess(\''+uid+'\',\''+(u.email||'')+'\')" title="Révoquer l\'accès" class="text-red-400 hover:text-red-600 font-bold px-1">✕</button>':'';
-      div.innerHTML='<div class="flex-1"><span class="font-bold">'+(u.name||u.email)+'</span> <span class="text-gray-400">('+u.email+')</span></div><div class="flex items-center gap-1.5">'+selectHtml+delBtn+'</div>';
+      var actions='';
+      if(isAdmin&&!isSelf){
+        actions+='<button onclick="resetUserPassword(\''+(u.email||'')+'\')" title="Envoyer un email de réinitialisation du mot de passe" class="text-blue-400 hover:text-blue-600 font-bold px-1"><i class="fas fa-key"></i></button>';
+        actions+='<button onclick="toggleUserDisabled(\''+uid+'\','+(!isDisabled)+')" title="'+(isDisabled?'Réactiver':'Suspendre')+'" class="'+(isDisabled?'text-green-500 hover:text-green-700':'text-orange-400 hover:text-orange-600')+' font-bold px-1"><i class="fas fa-'+(isDisabled?'play':'pause')+'"></i></button>';
+        actions+='<button onclick="revokeUserAccess(\''+uid+'\',\''+(u.email||'')+'\')" title="Supprimer définitivement l\'accès" class="text-red-400 hover:text-red-600 font-bold px-1">✕</button>';
+      }
+      var disabledBadge=isDisabled?'<span class="px-1.5 py-0.5 rounded text-xs font-bold bg-red-100 text-red-600 mr-1">SUSPENDU</span>':'';
+      div.innerHTML='<div class="flex-1">'+disabledBadge+'<span class="font-bold">'+(u.name||u.email)+'</span> <span class="text-gray-400">('+u.email+')</span></div><div class="flex items-center gap-1.5">'+selectHtml+actions+'</div>';
       cont.appendChild(div);
     });
   }).catch(function(err){
@@ -3148,8 +3418,22 @@ function changeUserRole(uid,role){
     renderActiveAccounts();
   }).catch(function(err){ alert('Erreur : '+err.message); });
 }
+function toggleUserDisabled(uid,disabled){
+  var msg=disabled?"Suspendre l'accès de ce compte ? Il pourra être réactivé à tout moment.":"Réactiver l'accès de ce compte ?";
+  if(!confirm(msg)) return;
+  db.collection('roles').doc(uid).update({disabled:disabled}).then(function(){
+    renderActiveAccounts();
+  }).catch(function(err){ alert('Erreur : '+err.message); });
+}
+function resetUserPassword(email){
+  if(!email){alert('Email inconnu pour ce compte.');return;}
+  if(!confirm("Envoyer un email de réinitialisation de mot de passe à "+email+" ?")) return;
+  fbAuth.sendPasswordResetEmail(email).then(function(){
+    alert('Email de réinitialisation envoyé à '+email+'.');
+  }).catch(function(err){ alert('Erreur : '+translateFirebaseError(err)); });
+}
 function revokeUserAccess(uid,email){
-  if(!confirm("Révoquer l'accès de "+(email||'cet utilisateur')+" ?\n\nSon compte de connexion existera toujours techniquement, mais il perdra immédiatement tout accès aux données (lecture et écriture). Il faudra le ré-inviter pour qu'il retrouve l'accès.")) return;
+  if(!confirm("Supprimer définitivement l'accès de "+(email||'cet utilisateur')+" ?\n\nSon compte de connexion existera toujours techniquement, mais il perdra tout accès aux données. Il faudra le ré-inviter (ou le recréer) pour qu'il retrouve l'accès.\n\nAstuce : pour une coupure temporaire et réversible, utilise plutôt le bouton ⏸ Suspendre.")) return;
   db.collection('roles').doc(uid).delete().then(function(){
     if(email) db.collection('invites').doc(email).delete().catch(function(){});
     renderActiveAccounts();
@@ -3252,123 +3536,129 @@ function renderPlanning(){
   var DAYS_LABEL=['D','L','M','M','J','V','S'];
   var ncols=months.length;
   grid.style.gridTemplateColumns='40px repeat('+ncols+',1fr)';
+  grid.style.display='grid';
 
   if(!eq().planningMerges) eq().planningMerges={};
   if(!eq().planningText) eq().planningText={};
 
-  // Header
+  function place(el,row,col){ el.style.gridRow=row; el.style.gridColumn=col; }
+  function getMerge(key){
+    var m=eq().planningMerges[key];
+    if(m===undefined) return null;
+    if(m==='hidden') return 'hidden';
+    if(typeof m==='number') return {span:m,dir:'h'}; // ancien format = toujours horizontal
+    return m;
+  }
+
+  // Header (row 1)
   var corner=mkCell('','pcell pcell-hdr',false);
-  corner.style.minHeight='28px';
+  corner.style.minHeight='28px'; place(corner,1,1);
   grid.appendChild(corner);
-  months.forEach(function(mon){
+  months.forEach(function(mon,mi){
     var c=mkCell(MOIS_C[mon.m]+' '+mon.y,'pcell pcell-hdr',false);
     c.style.minHeight='28px';c.style.fontSize='9px';c.style.fontWeight='800';
+    place(c,1,2+mi);
     grid.appendChild(c);
   });
 
-  // Day rows
+  // Day rows (rows 2..32)
   for(var day=1;day<=31;day++){
     var dl=mkCell(String(day),'pcell pcell-hdr',false);
-    dl.style.minHeight='22px';
+    dl.style.minHeight='22px'; place(dl,1+day,1);
     grid.appendChild(dl);
-    months.forEach(function(mon){
+    months.forEach(function(mon,mi){
+      var col=2+mi, row=1+day;
       var date=new Date(mon.y,mon.m,day);
       if(date.getMonth()!==mon.m){
         var empty=mkCell('','pcell',false);
         empty.style.background='#f9fafb';empty.style.cursor='default';empty.style.minHeight='22px';
+        place(empty,row,col);
         grid.appendChild(empty);return;
       }
       var dow=date.getDay();
       var isWE=(dow===0||dow===6);
       var key=toISO(date);
 
-      // Check if this cell is part of a merge (hidden)
-      if(eq().planningMerges[key]==='hidden'){
-        var hidden=document.createElement('div');
-        hidden.className='pcell';hidden.style.background='transparent';hidden.style.minHeight='22px';
-        hidden.dataset.key=key;hidden.dataset.mergeHidden='1';
-        hidden.oncontextmenu=function(e){e.preventDefault();unmergeCell(this.dataset.key);};
-        grid.appendChild(hidden);return;
-      }
+      // Cellule absorbee par une fusion (horizontale ou verticale) : on ne la dessine pas du tout
+      if(getMerge(key)==='hidden') return;
 
       var t=eq().planning[key]||'';
       var txt=eq().planningText[key]||'';
-      var cls=isWE?'pcell pg-we':'pcell '+(t?'pg-'+t:'pg-normal');
+      var cls=isWE&&!t?'pcell pg-we':'pcell '+(t?'pg-'+t:'pg-normal');
 
-      // Check for merge span
-      var mergeSpan=eq().planningMerges[key]||1;
-      if(typeof mergeSpan==='number'&&mergeSpan>1){
-        // Merged cell spans multiple columns
-      }
+      var merge=getMerge(key);
 
       var label=isWE?DAYS_LABEL[dow]:'';
       if(!isWE&&dow===1){var wn=getWeekNumber(date);label='S'+wn;}
-      if(txt&&!isWE) label=txt;
+      if(txt) label=txt;
 
-      var c=mkCell(label,cls,!isWE);
+      var c=mkCell(label,cls,true);
       c.dataset.key=key;
       c.dataset.dow=dow;
       c.style.minHeight='22px';
-      if(typeof mergeSpan==='number'&&mergeSpan>1){
-        c.style.gridColumn='span '+mergeSpan;
+
+      if(merge&&merge.span>1){
+        if(merge.dir==='v'){ c.style.gridRow=row+' / span '+merge.span; c.style.gridColumn=col; }
+        else { c.style.gridColumn=col+' / span '+merge.span; c.style.gridRow=row; }
         c.style.zIndex='2';
+      } else {
+        place(c,row,col);
       }
 
-      if(!isWE){
-        c.onclick=function(e){
-          e.stopPropagation();
-          var k=this.dataset.key;
-          if(pgMode==='text'){
-            openCellTextEditor(k,this);
-          } else if(pgMode==='merge'){
-            handleMergeClick(k,this);
-          } else {
-            eq().planning[k]=pgType;
-            applyClassToCell(this,pgType);
-            if(!pgType) {delete eq().planningText[k];}
-            scheduleSave();
-          }
-        };
-        c.oncontextmenu=function(e){
-          e.preventDefault();
-          var k=this.dataset.key;
-          if(eq().planningMerges[k]>1) {unmergeCell(k);return;}
-          delete eq().planning[k];
-          delete eq().planningText[k];
-          applyClassToCell(this,'');
+      c.onclick=function(e){
+        e.stopPropagation();
+        var k=this.dataset.key;
+        if(pgMode==='text'){
+          openCellTextEditor(k,this);
+        } else if(pgMode==='merge'){
+          handleMergeClick(k,this);
+        } else {
+          eq().planning[k]=pgType;
+          applyClassToCell(this,pgType);
+          if(!pgType) {delete eq().planningText[k];}
           scheduleSave();
-        };
-        c.ondblclick=function(e){
-          e.stopPropagation();
-          if(pgMode!=='paint') return;
-          var k=this.dataset.key;
-          var date=new Date(k);
-          var dow=date.getDay();
-          var mon=new Date(date);
-          mon.setDate(date.getDate()-(dow===0?6:dow-1));
-          for(var i=0;i<5;i++){
-            var d=new Date(mon);d.setDate(mon.getDate()+i);
-            var dk=toISO(d);
-            eq().planning[dk]=pgType;
-          }
-          scheduleSave();renderPlanning();
-        };
-        c.onmousedown=function(e){
-          if(e.button!==0||pgMode!=='paint') return;
-          pgDragging=true;pgDragType=pgType;
-          var k=this.dataset.key;
-          eq().planning[k]=pgDragType;
-          applyClassToCell(this,pgDragType);
-          scheduleSave();
-        };
-        c.onmouseenter=function(e){
-          if(!pgDragging||pgMode!=='paint') return;
-          var k=this.dataset.key;
-          eq().planning[k]=pgDragType;
-          applyClassToCell(this,pgDragType);
-          scheduleSave();
-        };
-      }
+        }
+      };
+      c.oncontextmenu=function(e){
+        e.preventDefault();
+        var k=this.dataset.key;
+        var m=getMerge(k);
+        if(m&&m.span>1) {unmergeCell(k);return;}
+        delete eq().planning[k];
+        delete eq().planningText[k];
+        applyClassToCell(this,'');
+        scheduleSave();
+      };
+      c.ondblclick=function(e){
+        e.stopPropagation();
+        if(pgMode!=='paint') return;
+        var k=this.dataset.key;
+        var date=new Date(k);
+        var dow=date.getDay();
+        var mon=new Date(date);
+        mon.setDate(date.getDate()-(dow===0?6:dow-1));
+        for(var i=0;i<5;i++){
+          var d=new Date(mon);d.setDate(mon.getDate()+i);
+          var dk=toISO(d);
+          eq().planning[dk]=pgType;
+        }
+        scheduleSave();renderPlanning();
+      };
+      c.onmousedown=function(e){
+        if(e.button!==0||pgMode!=='paint') return;
+        pgDragging=true;pgDragType=pgType;
+        var k=this.dataset.key;
+        eq().planning[k]=pgDragType;
+        applyClassToCell(this,pgDragType);
+        scheduleSave();
+      };
+      c.onmouseenter=function(e){
+        if(!pgDragging||pgMode!=='paint') return;
+        var k=this.dataset.key;
+        eq().planning[k]=pgDragType;
+        applyClassToCell(this,pgDragType);
+        scheduleSave();
+      };
       grid.appendChild(c);
     });
   }
@@ -3395,29 +3685,47 @@ function handleMergeClick(key,cell){
     cell.style.outline='3px solid #7c3aed';
     return;
   }
-  // Check adjacency (same row = same day, adjacent months)
-  var d1=new Date(pgMergeFirst), d2=new Date(key);
-  if(d1.getDate()!==d2.getDate()){
-    alert('La fusion n\'est possible qu\'entre cases de meme ligne (meme jour, mois differents).');
-    pgMergeFirst=null;renderPlanning();return;
-  }
-  // Calculate span distance
-  var parts1=pgMergeFirst.split('-'), parts2=key.split('-');
-  var m1=parseInt(parts1[1])-1, y1=parseInt(parts1[0]);
-  var m2=parseInt(parts2[1])-1, y2=parseInt(parts2[0]);
-  var mo1=y1*12+m1, mo2=y2*12+m2;
-  if(mo1>mo2){var tmp=pgMergeFirst;pgMergeFirst=key;key=tmp;mo1=[mo2,mo2=mo1][0];}
-  var span=mo2-mo1+1;
-  if(span<2){alert('Selectionnez 2 cellules distinctes.');pgMergeFirst=null;renderPlanning();return;}
-  // Mark the merged range
-  if(!eq().planningMerges) eq().planningMerges={};
-  eq().planningMerges[pgMergeFirst]=span;
-  // Hide all subsequent cells in the merge
-  var startY=parseInt(pgMergeFirst.split('-')[0]),startM=parseInt(pgMergeFirst.split('-')[1])-1;
-  var day=parseInt(pgMergeFirst.split('-')[2]);
-  for(var i=1;i<span;i++){
-    var nm=new Date(startY,startM+i,day);
-    if(nm.getDate()===day) eq().planningMerges[toISO(nm)]='hidden';
+  if(pgMergeDir==='h'){
+    // Fusion horizontale: meme jour, mois differents
+    var d1=new Date(pgMergeFirst), d2=new Date(key);
+    if(d1.getDate()!==d2.getDate()){
+      alert("La fusion horizontale n'est possible qu'entre cases du meme jour (mois differents).");
+      pgMergeFirst=null;renderPlanning();return;
+    }
+    var parts1=pgMergeFirst.split('-'), parts2=key.split('-');
+    var m1=parseInt(parts1[1])-1, y1=parseInt(parts1[0]);
+    var m2=parseInt(parts2[1])-1, y2=parseInt(parts2[0]);
+    var mo1=y1*12+m1, mo2=y2*12+m2;
+    var firstKey=pgMergeFirst, secondKey=key;
+    if(mo1>mo2){firstKey=key;secondKey=pgMergeFirst;var t=mo1;mo1=mo2;mo2=t;}
+    var span=mo2-mo1+1;
+    if(span<2){alert('Selectionnez 2 cellules distinctes.');pgMergeFirst=null;renderPlanning();return;}
+    if(!eq().planningMerges) eq().planningMerges={};
+    eq().planningMerges[firstKey]={span:span,dir:'h'};
+    var startY=parseInt(firstKey.split('-')[0]),startM=parseInt(firstKey.split('-')[1])-1;
+    var day=parseInt(firstKey.split('-')[2]);
+    for(var i=1;i<span;i++){
+      var nm=new Date(startY,startM+i,day);
+      if(nm.getDate()===day) eq().planningMerges[toISO(nm)]='hidden';
+    }
+  } else {
+    // Fusion verticale: meme mois, jours qui se suivent
+    var p1=pgMergeFirst.split('-'), p2=key.split('-');
+    if(p1[0]!==p2[0]||p1[1]!==p2[1]){
+      alert("La fusion verticale n'est possible qu'entre cases du meme mois (jours differents).");
+      pgMergeFirst=null;renderPlanning();return;
+    }
+    var day1=parseInt(p1[2]), day2=parseInt(p2[2]);
+    var firstKey=pgMergeFirst, lo=day1, hi=day2;
+    if(day1>day2){firstKey=key;lo=day2;hi=day1;}
+    var span=hi-lo+1;
+    if(span<2){alert('Selectionnez 2 cellules distinctes.');pgMergeFirst=null;renderPlanning();return;}
+    if(!eq().planningMerges) eq().planningMerges={};
+    eq().planningMerges[firstKey]={span:span,dir:'v'};
+    var y=parseInt(p1[0]), m=parseInt(p1[1])-1;
+    for(var i=1;i<span;i++){
+      eq().planningMerges[toISO(new Date(y,m,lo+i))]='hidden';
+    }
   }
   pgMergeFirst=null;
   scheduleSave();renderPlanning();
@@ -3425,14 +3733,17 @@ function handleMergeClick(key,cell){
 
 function unmergeCell(key){
   if(!eq().planningMerges) return;
-  var span=eq().planningMerges[key];
-  if(typeof span==='number'&&span>1){
+  var raw=eq().planningMerges[key];
+  var span, dir;
+  if(typeof raw==='number'){span=raw;dir='h';}
+  else if(raw&&typeof raw==='object'){span=raw.span;dir=raw.dir;}
+  if(span>1){
     var parts=key.split('-');
     var y=parseInt(parts[0]),m=parseInt(parts[1])-1,d=parseInt(parts[2]);
     delete eq().planningMerges[key];
     for(var i=1;i<span;i++){
-      var nm=new Date(y,m+i,d);
-      if(nm.getDate()===d) delete eq().planningMerges[toISO(nm)];
+      var nm=dir==='v'?new Date(y,m,d+i):new Date(y,m+i,d);
+      if(dir==='v'||nm.getDate()===d) delete eq().planningMerges[toISO(nm)];
     }
   } else {
     delete eq().planningMerges[key];
@@ -3443,13 +3754,17 @@ function unmergeCell(key){
 function applyClassToCell(cell,type){
   var dow=parseInt(cell.dataset.dow||'0');
   var isWE=(dow===0||dow===6);
-  if(isWE) return;
-  cell.className='pcell '+(type?'pg-'+type:'pg-normal');
+  cell.className='pcell '+(type?'pg-'+type:(isWE?'pg-we':'pg-normal'));
   cell.style.minHeight='22px';
-  // Restore Monday week label
-  if(dow===1){
+  // Restore Monday week label / weekend letter when no text/type set
+  if(type){
+    cell.innerText='';
+  } else if(!isWE&&dow===1){
     var d=new Date(cell.dataset.key);
     cell.innerText='S'+getWeekNumber(d);
+  } else if(isWE){
+    var DAYS_LABEL=['D','L','M','M','J','V','S'];
+    cell.innerText=DAYS_LABEL[dow];
   } else {
     cell.innerText='';
   }
@@ -3694,12 +4009,12 @@ function renderLiveCompo(){
   if(!tDiv||!rDiv) return;
   var now=s.timerSec||0;
 
-  function makeRow(p,isTit){
+  function makeRow(p,isTit,slot){
     liveEnsurePlayerFields(p);
     var mins=livePlayerMinutes(p,now);
     return '<div class="pitch-row'+(isTit?'':' bench')+'">'+
-      '<span class="pn">'+(p.numero||'-')+'</span>'+
-      '<span class="font-bold flex-1" style="font-size:11px">'+p.nom+'<span class="text-gray-400 font-normal"> · '+p.poste+'</span></span>'+
+      '<span class="pn" title="Poste sur la feuille">'+slot+'</span>'+
+      '<span class="font-bold flex-1" style="font-size:11px">'+p.nom+(p.numero?' <span class="text-gray-400 font-normal">#'+p.numero+'</span>':'')+'<span class="text-gray-400 font-normal"> · '+p.poste+'</span></span>'+
       '<span class="pmins" id="pmin-'+p.id+'">'+mins+"'</span>"+
       '<div class="pitch-actions">'+
         '<button class="pa-essai" title="Essai" onclick="liveLogPlayerEvent('+p.id+',\'essai\')">🏉</button>'+
@@ -3711,13 +4026,18 @@ function renderLiveCompo(){
       '</div>';
   }
 
-  tDiv.innerHTML=(s.compo.titulaires||[]).map(function(p){return makeRow(p,true);}).join('')||'<p class="text-xs text-gray-400 italic">Aucune titulaire — ajoutez via le sélecteur ci-dessus.</p>';
-  rDiv.innerHTML=(s.compo.remplacantes||[]).map(function(p){return makeRow(p,false);}).join('')||'<p class="text-xs text-gray-400 italic">Aucune remplaçante.</p>';
+  var titList=(s.compo.titulaires||[]).slice().sort(function(a,b){return (a.numero||99)-(b.numero||99);});
+  var remList=(s.compo.remplacantes||[]).slice().sort(function(a,b){return (a.numero||99)-(b.numero||99);});
 
-  var titList=s.compo.titulaires||[];
-  var remList=s.compo.remplacantes||[];
-  if(changeOut){changeOut.innerHTML=titList.map(function(p){return '<option value="'+p.id+'">'+p.nom+'</option>';}).join('')||'<option value="">--</option>';}
-  if(changeIn){changeIn.innerHTML=remList.map(function(p){return '<option value="'+p.id+'">'+p.nom+'</option>';}).join('')||'<option value="">--</option>';}
+  tDiv.innerHTML=titList.map(function(p,i){return makeRow(p,true,i+1);}).join('')||'<p class="text-xs text-gray-400 italic">Aucune titulaire — ajoutez via le sélecteur ci-dessus (postes 1 à 15).</p>';
+  rDiv.innerHTML=remList.map(function(p,i){return makeRow(p,false,15+i+1);}).join('')||'<p class="text-xs text-gray-400 italic">Aucune remplaçante (postes 16 à 23).</p>';
+
+  var tCount=document.getElementById('live-tit-count'), rCount=document.getElementById('live-rem-count');
+  if(tCount){tCount.innerText=titList.length+'/15';tCount.style.color=titList.length===15?'#0E7A4C':'#B45309';}
+  if(rCount){rCount.innerText=remList.length+'/8';rCount.style.color=remList.length<=8?'#B4530A':'#DC2626';}
+
+  if(changeOut){changeOut.innerHTML=titList.map(function(p){return '<option value="'+p.id+'">'+(p.numero?'#'+p.numero+' ':'')+p.nom+'</option>';}).join('')||'<option value="">--</option>';}
+  if(changeIn){changeIn.innerHTML=remList.map(function(p){return '<option value="'+p.id+'">'+(p.numero?'#'+p.numero+' ':'')+p.nom+'</option>';}).join('')||'<option value="">--</option>';}
 }
 
 function updateLiveMinsOnly(){
