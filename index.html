@@ -87,6 +87,23 @@ h1,h2,h3,.font-black,#tab-title{font-family:"Oswald","Segoe UI",sans-serif;}
 .niv-n3{background:#facc15;color:#713f12;}
 .niv-n4{background:#86efac;color:#14532d;}
 .niv-n5{background:#16a34a;color:#fff;}
+/* criteres techniques par niveau 0-4 */
+.niv-l0{background:#ef4444;color:#fff;}
+.niv-l1{background:#f97316;color:#fff;}
+.niv-l2{background:#facc15;color:#713f12;}
+.niv-l3{background:#86efac;color:#14532d;}
+.niv-l4{background:#16a34a;color:#fff;}
+.crit-card{border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:8px;background:#fff;}
+.crit-card-head{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;cursor:pointer;background:#f9fafb;}
+.crit-card-head:hover{background:#f3f4f6;}
+.crit-band{display:flex;gap:2px;}
+.crit-band-item{flex:1;height:24px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;border-radius:4px;cursor:pointer;transition:all .15s;opacity:.4;}
+.crit-band-item.active{opacity:1;box-shadow:0 0 0 2px rgba(0,0,0,.15) inset;transform:scaleY(1.08);}
+.crit-body{padding:8px 10px;border-top:1px solid #f0f0f0;background:#fff;}
+.crit-level-row{display:flex;gap:8px;align-items:flex-start;padding:5px 6px;border-radius:6px;cursor:pointer;margin-bottom:3px;}
+.crit-level-row:hover{background:#f9fafb;}
+.crit-level-row.sel{background:#eff6ff;box-shadow:0 0 0 1px #93c5fd inset;}
+.crit-level-badge{flex-shrink:0;width:26px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;}
 /* read-only mode */
 .ro-hide{display:none!important;}
 /* match live */
@@ -742,6 +759,12 @@ button{font-family:"Barlow",sans-serif;}
         <div id="std-tech-sliders" class="space-y-1.5 mb-3"></div>
         <button onclick="saveStdTech()" class="bg-mhr text-white py-1.5 px-4 rounded-lg font-bold text-xs hover:bg-blue-800"><i class="fas fa-save mr-1"></i>Sauvegarder</button>
         <div class="mt-3"><canvas id="stdTechRadar" height="200"></canvas></div>
+        <!-- REFERENTIEL CRITERES PAR NIVEAU 0-4 -->
+        <div class="mt-4 pt-3 border-t border-gray-100">
+          <h5 class="font-black text-xs uppercase text-gray-500 mb-2"><i class="fas fa-list-check mr-1"></i>Référentiel — Attendus par niveau (0 à 4)</h5>
+          <p class="text-xs text-gray-400 mb-2">Critères généraux communs à toutes les joueuses, puis critères spécifiques au poste sélectionné ci-dessus.</p>
+          <div id="crit-ref-container"></div>
+        </div>
       </div>
       <div class="bg-white p-4 rounded-xl shadow-sm">
         <h4 class="font-black text-mhr mb-3 border-b pb-2 uppercase text-xs">Attendus Physiques</h4>
@@ -934,8 +957,8 @@ button{font-family:"Barlow",sans-serif;}
         <div class="bg-white p-4 rounded-xl shadow-sm">
           <div class="flex justify-between items-start mb-3">
             <div>
-              <h4 class="font-bold uppercase text-xs text-gray-500">Niveau Technique par Poste</h4>
-              <p class="text-xs text-gray-400 mt-0.5">Cliquez sur un niveau pour l'attribuer. Modifiable librement.</p>
+              <h4 class="font-bold uppercase text-xs text-gray-500">Classification Technique — Niveaux 0 à 4</h4>
+              <p class="text-xs text-gray-400 mt-0.5">Cliquez sur un critère pour voir les attendus par niveau, puis sélectionnez le niveau de la joueuse. Recliquer désélectionne.</p>
             </div>
             <button onclick="openModalRadarConfig()" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-lg font-bold"><i class="fas fa-cog mr-1"></i>Config</button>
           </div>
@@ -1286,6 +1309,125 @@ var DEF_PHYS = {
   '10':{v20:2.8,v40:5.1,squat:82,dc:62,tp:67,taille:162},'Centre':{v20:2.75,v40:5.0,squat:88,dc:65,tp:70,taille:165},
   'Ailiere':{v20:2.65,v40:4.7,squat:82,dc:60,tp:65,taille:162},'15':{v20:2.7,v40:4.9,squat:85,dc:63,tp:68,taille:165}
 };
+
+// =====================================================
+// CRITERES TECHNIQUES PAR NIVEAU (0 à 4) - source fichier "Suivi de la joueuse"
+// =====================================================
+// Chaque critere = tableau de 5 descriptions [Niveau0, Niveau1, Niveau2, Niveau3, Niveau4]
+var CRITERES_GENERAL = {
+  'passer':{label:'Passer',niveaux:[
+    "J'atteins jamais la cible",
+    "J'atteins quelques fois le partenaire",
+    "J'atteins une cible proche",
+    "J'atteins le partenaire mais pas toujours la cible",
+    "J'atteins régulièrement la cible quelle que soit la distance"
+  ]},
+  'plaquer':{label:'Plaquer',niveaux:[
+    "N'arrête pas l'attaquant",
+    "Stoppe parfois l'avancée",
+    "Stoppe l'avancée du porteur de balle",
+    "Capable de plaquer et de se relever pour défendre",
+    "Capable d'adapter son plaquage pour récupérer"
+  ]},
+  'soutenir':{label:'Soutenir',niveaux:[
+    "Problème de circulation",
+    "Difficultés à enchaîner course et combat",
+    "Efficace mais intervention lente",
+    "Rapide et lutte sur le ballon",
+    "Rapide et lutte devant le ballon"
+  ]},
+  'contact':{label:'Attitude au contact',niveaux:[
+    "Tombe devant le défenseur",
+    "Ne lutte pas au contact",
+    "Lutte mais inefficace",
+    "Lutte au contact et reste équilibré",
+    "Lutte au contact et reste équilibré. Avance !"
+  ]}
+};
+// Criteres specifiques par poste. Certains postes (3eme ligne aile, 8) n'ont pas
+// de critere specifique dans le referentiel : seuls les criteres generaux s'appliquent.
+var CRITERES_POSTE = {
+  'Pilier':{
+    'melee':{label:'Mêlée',niveaux:[
+      "Mauvaise tenue de mêlée : épaule plus basse que le bassin, dos rond. Dangereux",
+      "Dos plat mais jambes tendues et pieds pas sur la même ligne",
+      "Maîtrise les trois commandements : dos plat, jambes fléchies, genoux sous le bassin ou légèrement en arrière, pieds sur la même ligne, tête relevée et poussée dans l'axe",
+      "Niveau 2 + capable de se déplacer en faisant des petits pas et d'assurer un serrage efficace avec les bras",
+      "Maîtrise les compétences du niveau 3, met immédiatement la pression sur l'adversaire et maîtrise les axes de poussée imposés par l'adversaire"
+    ]}
+  },
+  'Talonneuse':{
+    'lancer':{label:'Lancer (touche)',niveaux:[
+      "Manque de constance",
+      "Atteint les zones 1 et 2 régulièrement",
+      "Atteint les zones 1 et 2 avec le bon timing",
+      "Atteint toutes les zones",
+      "Maîtrise le timing de lancer sur différentes zones"
+    ]}
+  },
+  '2eme ligne':{
+    'touche':{label:'Touche (saut)',niveaux:[
+      "A du mal à sauter en touche",
+      "Répète un système simple",
+      "Saute en déplacement",
+      "Monte vite en attaque et en défense",
+      "Pilote les systèmes défensifs et offensifs"
+    ]},
+    'melee2l':{label:'Mêlée',niveaux:[
+      "Tient entre 45 secondes et 1 minute en gainage planche, genoux fléchis (prérequis physique)",
+      "Mauvaise tenue de mêlée : dos rond, jambes insuffisamment tendues, perte d'alignement. Dangereux",
+      "Maîtrise les trois commandements : pieds sur la même ligne, part à genoux, garde le dos plat et la tête relevée",
+      "Maîtrise le niveau 2 + bien placée sous le pli fessier du pilier, serrage efficace avec les bras",
+      "Niveau 4 + côté gauche : assure la bonne circulation du ballon"
+    ]}
+  },
+  'Centre':{
+    'duel':{label:'Duel',niveaux:[
+      "N'exploite pas les espaces",
+      "Se démarque difficilement à la prise de balle",
+      "Prend l'intervalle avec de la vitesse",
+      "Met le ballon dans le dos de la défense",
+      "Fait jouer un partenaire proche"
+    ]}
+  },
+  '9':{'jap':{label:'Jeu au pied (JAP)',niveaux:[
+    "Trop d'irrégularité",
+    "Maîtrise une partie des JAP",
+    "Alterne différents JAP sans pression",
+    "Alterne différents JAP sous pression",
+    "Adapte son JAP pour avancer / marquer"
+  ]}},
+  '10':{'jap':{label:'Jeu au pied (JAP)',niveaux:[
+    "Trop d'irrégularité",
+    "Maîtrise une partie des JAP",
+    "Alterne différents JAP sans pression",
+    "Alterne différents JAP sous pression",
+    "Adapte son JAP pour avancer / marquer"
+  ]}},
+  '15':{'jap':{label:'Jeu au pied (JAP)',niveaux:[
+    "Trop d'irrégularité",
+    "Maîtrise une partie des JAP",
+    "Alterne différents JAP sans pression",
+    "Alterne différents JAP sous pression",
+    "Adapte son JAP pour avancer / marquer"
+  ]}},
+  'Ailiere':{
+    'reception':{label:'Réception jeu aérien',niveaux:[
+      "Lit mal les trajectoires aériennes",
+      "Attrape quelques fois un ballon de volée",
+      "Attrape un ballon sur un JAP long",
+      "Attrape un ballon en extension",
+      "Attrape un ballon lors d'un duel"
+    ]}
+  }
+};
+function getCritForPoste(poste){
+  var out=[];
+  Object.keys(CRITERES_GENERAL).forEach(function(k){out.push({key:'gen_'+k,label:CRITERES_GENERAL[k].label,niveaux:CRITERES_GENERAL[k].niveaux,cat:'general'});});
+  var spec=CRITERES_POSTE[poste]||{};
+  Object.keys(spec).forEach(function(k){out.push({key:'pos_'+k,label:spec[k].label,niveaux:spec[k].niveaux,cat:'poste'});});
+  return out;
+}
 
 // =====================================================
 // STANDARDS PP PAR NIVEAU (données Data PP logiciel)
@@ -2747,6 +2889,38 @@ function loadStdTech(){
     cont.appendChild(div);
   });
   updateStdTechRadar(vals,poste);
+  renderCritRef(poste);
+}
+
+// Referentiel consultable des criteres par niveau 0-4 (lecture seule) pour un poste donne
+function renderCritRef(poste){
+  var cont=document.getElementById('crit-ref-container');
+  if(!cont) return;
+  var crits=getCritForPoste(poste);
+  var generaux=crits.filter(function(c){return c.cat==='general';});
+  var specifiques=crits.filter(function(c){return c.cat==='poste';});
+  var html='';
+  html+='<div class="text-xs font-black uppercase text-gray-400 mb-1 tracking-wide">Critères généraux</div>';
+  generaux.forEach(function(c){html+=renderCritRefTable(c);});
+  html+='<div class="text-xs font-black uppercase text-gray-400 mb-1 mt-3 tracking-wide">Critères spécifiques — '+poste+'</div>';
+  if(specifiques.length===0){
+    html+='<p class="text-xs text-gray-400 italic">Aucun critère spécifique référencé pour ce poste.</p>';
+  } else {
+    specifiques.forEach(function(c){html+=renderCritRefTable(c);});
+  }
+  cont.innerHTML=html;
+}
+function renderCritRefTable(c){
+  var html='<div class="mb-3 rounded-lg border border-gray-200 overflow-hidden">';
+  html+='<div class="bg-gray-100 px-2 py-1 font-bold text-xs text-gray-600">'+c.label+'</div>';
+  c.niveaux.forEach(function(desc,n){
+    html+='<div class="flex items-start gap-2 px-2 py-1.5 text-xs border-t border-gray-100">';
+    html+='<span class="crit-level-badge shrink-0" style="background:'+NIV_L_COLORS[n]+';color:#fff">N'+n+'</span>';
+    html+='<span class="text-gray-600 leading-snug">'+desc+'</span>';
+    html+='</div>';
+  });
+  html+='</div>';
+  return html;
 }
 function updateStdTechRadar(initial,poste){
   poste=poste||document.getElementById('std-poste-select').value;
@@ -3771,41 +3945,90 @@ function applyClassToCell(cell,type){
 }
 
 // =================================================
-// NIVEAU TECHNIQUE PAR POSTE (N1-N5)
+// CLASSIFICATION TECHNIQUE PAR CRITERE - NIVEAUX 0 A 4
+// (Criteres generaux communs a toutes les joueuses + criteres specifiques au poste)
 // =================================================
-var NIV_COLORS=['niv-n1','niv-n2','niv-n3','niv-n4','niv-n5'];
-var NIV_LABELS=['N1','N2','N3','N4','N5'];
-var NIV_DESC=['N1 — Debutant','N2 — En formation','N3 — Intermediaire','N4 — Confirme','N5 — Elite'];
+var NIV_L_CLASS=['niv-l0','niv-l1','niv-l2','niv-l3','niv-l4'];
+var NIV_L_COLORS=['#dc2626','#f97316','#a16207','#16a34a','#166534'];
+var critOpenState={}; // memorise quelles cartes sont ouvertes (par critere key)
 
 function buildNivTechBand(j){
   var cont=document.getElementById('niv-tech-container');
   if(!cont) return;
-  var labels=getRadarLabels(j.poste);
-  if(!j.nivTech) j.nivTech={};
-  var html='<div class="text-xs font-bold text-gray-400 uppercase mb-1">Niveau technique par axe — '+j.poste+'</div>';
-  labels.forEach(function(label,i){
-    var cur=j.nivTech[i]||0; // 0=none, 1-5=level
-    html+='<div class="flex items-center gap-2 mb-1.5">';
-    html+='<span class="text-xs font-bold text-gray-500 w-28 shrink-0">'+label+'</span>';
-    html+='<div class="niv-band flex-1" style="gap:1px">';
-    for(var n=1;n<=5;n++){
-      var active=cur===n?' active':'';
-      html+='<div class="niv-band-item '+NIV_COLORS[n-1]+active+'" onclick="setNivTech('+j.id+','+i+','+n+')" title="'+NIV_DESC[n-1]+'">'+NIV_LABELS[n-1]+'</div>';
-    }
-    html+='</div>';
-    html+='<span class="text-xs font-black w-6 text-right" style="color:'+(cur?['#ef4444','#f97316','#eab308','#16a34a','#166534'][cur-1]:'#d1d5db')+'">'+( cur?NIV_LABELS[cur-1]:'—')+'</span>';
-    html+='</div>';
-  });
+  if(!j.critTech) j.critTech={};
+  var crits=getCritForPoste(j.poste);
+  var generaux=crits.filter(function(c){return c.cat==='general';});
+  var specifiques=crits.filter(function(c){return c.cat==='poste';});
+
+  // Synthese rapide en tete
+  var vals=crits.map(function(c){return j.critTech[c.key];}).filter(function(v){return v!==undefined&&v!==null;});
+  var moy=vals.length?(vals.reduce(function(a,b){return a+b;},0)/vals.length):null;
+  var html='';
+  html+='<div class="flex items-center justify-between mb-2 bg-gray-50 rounded-lg px-3 py-2">';
+  html+='<span class="text-xs font-bold text-gray-500">'+vals.length+'/'+crits.length+' critères évalués</span>';
+  html+='<span class="text-sm font-black" style="color:'+(moy!==null?NIV_L_COLORS[Math.round(moy)]:'#d1d5db')+'">'+(moy!==null?'Moyenne : '+moy.toFixed(1)+' / 4':'—')+'</span>';
+  html+='</div>';
+
+  html+='<div class="text-xs font-black uppercase text-gray-400 mb-1 tracking-wide"><i class="fas fa-users mr-1"></i>Critères généraux (toutes joueuses)</div>';
+  generaux.forEach(function(c){html+=renderCritCard(j,c);});
+
+  html+='<div class="text-xs font-black uppercase text-gray-400 mb-1 mt-3 tracking-wide"><i class="fas fa-shield-halved mr-1"></i>Critères spécifiques au poste — '+j.poste+'</div>';
+  if(specifiques.length===0){
+    html+='<p class="text-xs text-gray-400 italic px-1">Aucun critère spécifique référencé pour ce poste — seuls les critères généraux s\'appliquent.</p>';
+  } else {
+    specifiques.forEach(function(c){html+=renderCritCard(j,c);});
+  }
   cont.innerHTML=html;
 }
 
-function setNivTech(jid,axeIdx,niveau){
-  var j=eq().joueurs.find(function(x){return x.id===jid;});
+function renderCritCard(j,c){
+  var cur=j.critTech[c.key]; // undefined ou 0-4
+  var isOpen=!!critOpenState[c.key];
+  var html='<div class="crit-card">';
+  html+='<div class="crit-card-head" onclick="toggleCritCard(\''+c.key+'\')">';
+  html+='<span class="text-xs font-bold text-gray-700">'+c.label+'</span>';
+  html+='<div class="flex items-center gap-2">';
+  html+='<span class="text-xs font-black px-2 py-0.5 rounded-full" style="background:'+(cur!==undefined?NIV_L_COLORS[cur]:'#e5e7eb')+';color:#fff">'+(cur!==undefined?'Niv. '+cur:'—')+'</span>';
+  html+='<i class="fas fa-chevron-'+(isOpen?'up':'down')+' text-gray-400 text-xs"></i>';
+  html+='</div></div>';
+  if(isOpen){
+    html+='<div class="crit-body">';
+    // bandeau rapide de selection
+    html+='<div class="crit-band mb-2">';
+    for(var n=0;n<=4;n++){
+      var active=cur===n?' active':'';
+      html+='<div class="crit-band-item '+NIV_L_CLASS[n]+active+'" onclick="event.stopPropagation();setCritLevel(\''+j.id+'\',\''+c.key+'\','+n+')">N'+n+'</div>';
+    }
+    html+='</div>';
+    // descriptions detaillees, cliquables
+    c.niveaux.forEach(function(desc,n){
+      var sel=cur===n?' sel':'';
+      html+='<div class="crit-level-row'+sel+'" onclick="event.stopPropagation();setCritLevel(\''+j.id+'\',\''+c.key+'\','+n+')">';
+      html+='<span class="crit-level-badge" style="background:'+NIV_L_COLORS[n]+';color:#fff">N'+n+'</span>';
+      html+='<span class="text-xs text-gray-600 leading-snug">'+desc+'</span>';
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+  html+='</div>';
+  return html;
+}
+
+function toggleCritCard(key){
+  critOpenState[key]=!critOpenState[key];
+  var j=eq().joueurs.find(function(x){return x.id===window.activePlayerId;});
+  if(j) buildNivTechBand(j);
+}
+
+function setCritLevel(jid,key,niveau){
+  var j=eq().joueurs.find(function(x){return String(x.id)===String(jid);});
   if(!j) return;
-  if(!j.nivTech) j.nivTech={};
-  // Toggle off if already same
-  j.nivTech[axeIdx]=(j.nivTech[axeIdx]===niveau)?0:niveau;
-  scheduleSave();buildNivTechBand(j);
+  if(!j.critTech) j.critTech={};
+  // Toggle off si on reclique sur le meme niveau
+  if(j.critTech[key]===niveau){ delete j.critTech[key]; }
+  else { j.critTech[key]=niveau; }
+  scheduleSave();
+  buildNivTechBand(j);
 }
 
 // =================================================
