@@ -451,6 +451,10 @@ button{font-family:"Barlow",sans-serif;}
       <span class="nav-icon w-6 h-6 rounded-lg flex items-center justify-center text-xs" style="background:rgba(220,38,38,.35);color:#fca5a5">🔴</span>
       <span class="font-bold">Match Live</span>
     </a>
+    <a href="#" onclick="return showTab('analyse')" id="nav-analyse" class="sl flex items-center gap-3 py-2.5 px-4 rounded-lg mx-2 mb-0.5">
+      <span class="nav-icon w-6 h-6 rounded-lg flex items-center justify-center text-xs" style="background:rgba(124,58,237,.25);color:#c4b5fd"><i class="fas fa-chart-column"></i></span>
+      <span class="font-bold">Analyse</span>
+    </a>
     <a href="#" onclick="return showTab('suivi-matchs')" id="nav-suivi-matchs" class="sl flex items-center gap-3 py-2.5 px-4 rounded-lg mx-2 mb-0.5">
       <span class="nav-icon w-6 h-6 rounded-lg flex items-center justify-center text-xs" style="background:rgba(245,158,11,.25);color:#fbbf24"><i class="fas fa-stopwatch"></i></span>
       <span class="font-bold">Suivi Individuel</span>
@@ -750,15 +754,19 @@ button{font-family:"Barlow",sans-serif;}
   <div id="standards" class="tab-content hidden">
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div class="bg-white p-4 rounded-xl shadow-sm">
-        <h4 class="font-black text-mhr mb-3 border-b pb-2 uppercase text-xs">Attendus Techniques Elite</h4>
+        <h4 class="font-black text-mhr mb-3 border-b pb-2 uppercase text-xs">Référentiel Technique</h4>
         <div class="mb-2"><select id="std-poste-select" onchange="loadStdTech()" class="border rounded-lg p-1.5 text-xs w-full">
           <option>Pilier</option><option>Talonneuse</option><option>2eme ligne</option>
           <option>3eme ligne aile</option><option>8</option><option>9</option><option>10</option>
           <option>Centre</option><option>Ailiere</option><option>15</option>
         </select></div>
-        <div id="std-tech-sliders" class="space-y-1.5 mb-3"></div>
-        <button onclick="saveStdTech()" class="bg-mhr text-white py-1.5 px-4 rounded-lg font-bold text-xs hover:bg-blue-800"><i class="fas fa-save mr-1"></i>Sauvegarder</button>
-        <div class="mt-3"><canvas id="stdTechRadar" height="200"></canvas></div>
+        <p class="text-xs text-gray-400 mb-2">Moyenne d'équipe par critère (niveau 0 à 4), calculée à partir des classifications individuelles des joueuses à ce poste.</p>
+        <div class="mt-1"><canvas id="stdTechRadar" height="200"></canvas></div>
+        <!-- COMPARATIF JOUEUSES DU POSTE -->
+        <div class="mt-3 bg-gray-50 rounded-xl p-3">
+          <h5 class="font-bold text-xs uppercase text-gray-400 mb-2">Joueuses du poste — Niveaux par critère</h5>
+          <div id="tech-comparison" class="text-xs overflow-x-auto"></div>
+        </div>
         <!-- REFERENTIEL CRITERES PAR NIVEAU 0-4 -->
         <div class="mt-4 pt-3 border-t border-gray-100">
           <h5 class="font-black text-xs uppercase text-gray-500 mb-2"><i class="fas fa-list-check mr-1"></i>Référentiel — Attendus par niveau (0 à 4)</h5>
@@ -920,6 +928,7 @@ button{font-family:"Barlow",sans-serif;}
             <div class="flex justify-between"><span class="text-gray-500">Essais (5 pts)</span><span id="ps-essais" class="font-black text-green-600">0</span></div>
             <div class="flex justify-between"><span class="text-gray-500">Transformations (2 pts)</span><span id="ps-transfos" class="font-black text-blue-600">0</span></div>
             <div class="flex justify-between"><span class="text-gray-500">Penalites (3 pts)</span><span id="ps-penalites" class="font-black text-orange-500">0</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Drops (3 pts)</span><span id="ps-drops" class="font-black text-purple-600">0</span></div>
             <div class="flex justify-between border-t pt-1 mt-1"><span class="text-gray-700 font-bold">Total points marques</span><span id="ps-points" class="font-black text-mhr">0</span></div>
             <div class="flex justify-between"><span class="text-gray-500">Cartons</span><span id="ps-cartons" class="font-black text-red-500">0</span></div>
             <div class="flex justify-between"><span class="text-gray-500">Blessures signalées (matchs)</span><span id="ps-blessures" class="font-black text-red-500">0</span></div>
@@ -960,13 +969,16 @@ button{font-family:"Barlow",sans-serif;}
               <h4 class="font-bold uppercase text-xs text-gray-500">Classification Technique — Niveaux 0 à 4</h4>
               <p class="text-xs text-gray-400 mt-0.5">Cliquez sur un critère pour voir les attendus par niveau, puis sélectionnez le niveau de la joueuse. Recliquer désélectionne.</p>
             </div>
-            <button onclick="openModalRadarConfig()" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-lg font-bold"><i class="fas fa-cog mr-1"></i>Config</button>
           </div>
           <!-- Bandeau niveau tech -->
           <div id="niv-tech-container" class="space-y-2 mb-4"></div>
+          <!-- Certification technique (memes presentation que le referentiel d'equipe) -->
+          <div class="mb-4 pt-3 border-t border-gray-100">
+            <h5 class="font-bold text-xs uppercase text-gray-400 mb-2">Certification Technique — Résultats</h5>
+            <canvas id="certifTechChart" height="160"></canvas>
+          </div>
           <!-- Attendus physiques par poste (compact) -->
           <div id="profil-phys-attendus" class="mb-3 bg-blue-50 border border-blue-100 rounded-xl p-2 text-xs"></div>
-          <div id="radar-sliders" class="grid grid-cols-3 gap-2 mb-3"></div>
           <canvas id="radarChart" height="260"></canvas>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1080,6 +1092,54 @@ button{font-family:"Barlow",sans-serif;}
           <button onclick="liveAddFreeEvent()" class="btn btn-ghost btn-sm"><i class="fas fa-plus"></i>Note libre</button>
         </div>
         <div id="live-events-list" class="space-y-1.5 flex-1 overflow-y-auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANALYSE (saisie stats post-match) -->
+  <div id="analyse" class="tab-content hidden">
+    <div class="bg-white p-4 rounded-xl shadow-sm mb-4">
+      <div class="flex flex-wrap items-end gap-3">
+        <div class="flex-1 min-w-[240px]">
+          <label class="block font-bold text-gray-400 text-xs mb-1 uppercase">Match à analyser</label>
+          <select id="an-match-select" onchange="loadAnalyseMatch()" class="w-full border rounded-lg p-2 text-xs"></select>
+        </div>
+        <button onclick="openAnalysePicker()" class="bg-blue-50 text-blue-700 font-bold py-2 px-4 rounded-lg border border-blue-200 hover:bg-blue-100 text-xs whitespace-nowrap"><i class="fas fa-user-group mr-1"></i>Choisir les 23 joueuses</button>
+        <button onclick="addCustomAnalyseStat()" class="bg-gray-50 text-gray-600 font-bold py-2 px-4 rounded-lg border border-gray-200 hover:bg-gray-100 text-xs whitespace-nowrap"><i class="fas fa-plus mr-1"></i>Nouveau type de stat</button>
+      </div>
+      <div id="an-match-info" class="mt-3 text-xs text-gray-400 font-bold"></div>
+    </div>
+    <div id="an-legend" class="flex flex-wrap gap-1.5 mb-2"></div>
+    <div id="an-custom-mgmt" class="flex flex-wrap gap-1.5 mb-3"></div>
+    <div id="an-roster" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+  </div>
+
+  <!-- MODAL SELECTION 23 JOUEUSES ANALYSE -->
+  <div id="modal-analyse-picker" class="modal-overlay" onclick="closeModalIfOverlay(event)">
+    <div class="modal-box" style="max-width:520px">
+      <h3 class="text-base font-black text-mhr mb-1 uppercase"><i class="fas fa-user-group mr-2"></i>Sélection des joueuses</h3>
+      <p class="text-xs text-gray-400 mb-3">Cochez les joueuses convoquées pour ce match et précisez leur rôle.</p>
+      <div id="an-picker-list" class="space-y-1 max-h-96 overflow-y-auto text-xs"></div>
+      <div class="flex gap-3 mt-4 justify-end">
+        <button onclick="closeModal('modal-analyse-picker')" class="px-4 py-2 rounded-lg border font-bold text-xs text-gray-600 hover:bg-gray-50">Annuler</button>
+        <button onclick="confirmAnalysePicker()" class="px-4 py-2 rounded-lg bg-mhr text-white font-bold text-xs hover:bg-blue-800">Valider la sélection</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL SAISIE MATCH PLANNING (Domicile/Exterieur + adversaire) -->
+  <div id="modal-match-cell" class="modal-overlay" onclick="closeModalIfOverlay(event)">
+    <div class="modal-box" style="max-width:360px">
+      <h3 class="text-base font-black text-mhr mb-3 uppercase"><i class="fas fa-futbol mr-2"></i>Match</h3>
+      <div class="flex gap-2 mb-3">
+        <button type="button" id="mc-btn-dom" onclick="setMatchCellLieu('dom')" class="flex-1 px-3 py-2 rounded-lg font-bold text-xs border-2">🏠 Domicile</button>
+        <button type="button" id="mc-btn-ext" onclick="setMatchCellLieu('ext')" class="flex-1 px-3 py-2 rounded-lg font-bold text-xs border-2">✈️ Extérieur</button>
+      </div>
+      <label class="font-bold text-gray-400 text-xs block mb-1">Adversaire</label>
+      <input type="text" id="mc-adv" placeholder="Nom de l'adversaire (vide = effacer)" class="w-full border rounded-lg p-2 text-xs mb-4">
+      <div class="flex gap-3 justify-end">
+        <button onclick="closeModal('modal-match-cell')" class="px-4 py-2 rounded-lg border font-bold text-xs text-gray-600 hover:bg-gray-50">Annuler</button>
+        <button onclick="confirmMatchCellEditor()" class="px-4 py-2 rounded-lg bg-mhr text-white font-bold text-xs hover:bg-blue-800"><i class="fas fa-save mr-1"></i>Valider</button>
       </div>
     </div>
   </div>
@@ -1201,19 +1261,6 @@ button{font-family:"Barlow",sans-serif;}
     <div class="flex gap-3 mt-4 justify-end">
       <button onclick="closeModal('modal-edit-match')" class="px-4 py-2 rounded-lg border font-bold text-xs text-gray-600 hover:bg-gray-50">Annuler</button>
       <button onclick="confirmEditMatch()" class="px-4 py-2 rounded-lg bg-mhr text-white font-bold text-xs hover:bg-blue-800"><i class="fas fa-save mr-1"></i>Enregistrer</button>
-    </div>
-  </div>
-</div>
-
-<div id="modal-radar-config" class="modal-overlay" onclick="closeModalIfOverlay(event)">
-  <div class="modal-box" style="max-width:460px">
-    <h3 class="text-base font-black text-mhr mb-2 uppercase">Axes du Radar (max 8)</h3>
-    <p class="text-xs text-gray-400 mb-3">Les 5 premiers axes sont communs. Le 6e est specifique au poste.</p>
-    <div id="radar-axis-list" class="space-y-2 mb-3"></div>
-    <button onclick="addRadarAxis()" class="text-xs text-blue-500 hover:underline font-bold mb-3 block"><i class="fas fa-plus mr-1"></i>Ajouter axe</button>
-    <div class="flex gap-3 justify-end">
-      <button onclick="closeModal('modal-radar-config')" class="px-4 py-2 rounded-lg border font-bold text-xs text-gray-600 hover:bg-gray-50">Annuler</button>
-      <button onclick="saveRadarConfig()" class="px-4 py-2 rounded-lg bg-mhr text-white font-bold text-xs hover:bg-blue-800"><i class="fas fa-save mr-1"></i>Appliquer</button>
     </div>
   </div>
 </div>
@@ -1642,7 +1689,7 @@ function eq(){return ALL[curEq];}
 
 // Charts
 var chClass=null,chClassEvol=null,chEffectif=null,chRes=null;
-var radarInst=null,stdTechRadarInst=null,stdPhysRadarInst=null,profilMinsInst=null,profilEvolInst=null;
+var radarInst=null,stdTechRadarInst=null,stdPhysRadarInst=null,profilMinsInst=null,profilEvolInst=null,certifTechInst=null;
 window.activePlayerId=null;
 var presViewDate=new Date(); presViewDate.setDate(1);
 var saveTimer=null;
@@ -1745,7 +1792,7 @@ function attachTeamListeners(){
 function refreshCurrentTab(){
   var selSeason=document.getElementById('season-select');
   if(selSeason) selSeason.value=eq().season||'2025-2026';
-  var tabs=['dashboard','planning','effectif','suivi-matchs','matchs-equipe','presences','standards','profil','match-live'];
+  var tabs=['dashboard','planning','effectif','suivi-matchs','matchs-equipe','presences','standards','profil','match-live','analyse'];
   var found='dashboard';
   tabs.forEach(function(t){var el=document.getElementById(t);if(el&&!el.classList.contains('hidden')) found=t;});
   showTab(found);
@@ -1776,7 +1823,7 @@ function switchEq(idx){
   lbl.style.background=eqColors[idx].bg;
   lbl.style.color=eqColors[idx].color;
   document.getElementById('season-select').value=eq().season||'2025-2026';
-  var tabs=['dashboard','planning','effectif','suivi-matchs','matchs-equipe','presences','standards','profil','match-live'];
+  var tabs=['dashboard','planning','effectif','suivi-matchs','matchs-equipe','presences','standards','profil','match-live','analyse'];
   var found='dashboard';
   tabs.forEach(function(t){var el=document.getElementById(t);if(el&&!el.classList.contains('hidden')) found=t;});
   showTab(found);
@@ -1793,7 +1840,7 @@ function showTab(id){
   var T={'dashboard':'Dashboard','planning':'Planning Annuel','effectif':'Effectif',
     'suivi-matchs':'Suivi Individuel','matchs-equipe':'Matchs Equipe',
     'presences':'Presences','standards':'Standards Poste','profil':'Profil Joueuse',
-    'match-live':'Match Live 🔴'};
+    'match-live':'Match Live 🔴','analyse':'Analyse Match'};
   var teamLabel=EQ_ICONS[curEq]+' '+EQ_NAMES[curEq]+(EQ_AGE[curEq]?' '+EQ_AGE[curEq]:'');
   document.getElementById('tab-title').innerText=(T[id]||id)+' — '+teamLabel;
   if(id==='dashboard') initDashboard();
@@ -1804,6 +1851,7 @@ function showTab(id){
   if(id==='matchs-equipe') renderMatchHistory();
   if(id==='standards'){loadStdTech();loadStdPhys();}
   if(id==='match-live') renderMatchLive();
+  if(id==='analyse') renderAnalyseTab();
   closeMobileSidebarIfOpen();
   return false;
 }
@@ -2139,14 +2187,11 @@ function openProfil(id){
   var badge=document.getElementById('p-statut-badge');
   badge.innerText=j.statut.toUpperCase();
   badge.className='inline-block px-3 py-1 rounded-full text-xs font-bold '+(j.statut==='Blessee'?'bg-red-500 text-white':j.statut==='Adapte'?'bg-orange-500 text-white':j.statut==='Suspendue'?'bg-purple-500 text-white':'bg-green-500 text-white');
-  // Ensure radar arrays
-  if(!Array.isArray(j.radar)||j.radar.length!==3) j.radar=[[5,5,5,5,5,5],[5,5,5,5,5,5],[5,5,5,5,5,5]];
-  j.radar.forEach(function(r,i){while(r.length<6)r.push(5);});
+  // Ensure phys radar array
   if(!j.physRadar||j.physRadar.length!==6) j.physRadar=[5,5,5,5,5,5];
-  if(!j.nivTech) j.nivTech={};
+  if(!j.critTech) j.critTech={};
   activeTri=1;
   updateTriButtons();
-  buildRadarSliders(j);
   buildNivTechBand(j);
   renderCustomStats(j);
   updateProfilStats(j);
@@ -2155,18 +2200,6 @@ function openProfil(id){
   if(medBox) medBox.classList.add('hidden');
   showTab('profil');
   setTimeout(function(){initRadar(j);initProfilCharts(j);updateProfile();},80);
-}
-
-function setActiveTri(t){
-  activeTri=t;
-  updateTriButtons();
-  var triColors=['#00A3E0','#22c55e','#f59e0b'];
-  var lbl=document.getElementById('tri-lbl-active');
-  var txt=document.getElementById('tri-lbl-text');
-  if(lbl) lbl.style.background=triColors[t-1];
-  if(txt) txt.innerText='T'+t+' actif';
-  var j=eq().joueurs.find(function(x){return x.id===window.activePlayerId;});
-  if(j){buildRadarSliders(j);initRadar(j);}
 }
 
 function renderProfilPhysAttendus(j){
@@ -2220,35 +2253,10 @@ function updateTriButtons(){
   });
 }
 
-function buildRadarSliders(j){
-  var cont=document.getElementById('radar-sliders');
-  cont.innerHTML='';
-  var labels=getRadarLabels(j.poste);
-  var triColors=['#00A3E0','#22c55e','#f59e0b'];
-  var vals=j.radar[activeTri-1]||[5,5,5,5,5,5];
-  labels.forEach(function(label,i){
-    var val=vals[i]||5;
-    var div=document.createElement('div');
-    div.innerHTML='<div class="flex justify-between mb-0.5"><span class="text-xs font-bold text-gray-500">'+label+'</span>'+
-      '<span id="rv-'+i+'" class="text-xs font-black" style="color:'+triColors[activeTri-1]+'">'+val+'</span></div>'+
-      '<input type="range" min="0" max="10" step="1" value="'+val+'" oninput="updateRadarVal('+i+',this.value)" class="w-full" style="accent-color:'+triColors[activeTri-1]+'">';
-    cont.appendChild(div);
-  });
-}
-
-function updateRadarVal(idx,val){
-  var j=eq().joueurs.find(function(x){return x.id===window.activePlayerId;});
-  if(!j) return;
-  j.radar[activeTri-1][idx]=parseInt(val);
-  document.getElementById('rv-'+idx).innerText=val;
-  scheduleSave();initRadar(j);
-}
-
 function initRadar(j){
   var ctx=document.getElementById('radarChart').getContext('2d');
   if(radarInst) radarInst.destroy();
-  var labels=getRadarLabels(j.poste);
-  var std=eq().stdTech[j.poste]||DEF_TECH[j.poste]||[7,7,7,7,7,7];
+  var labels=['20m','40m','Squat 3RM','DC 3RM','TP 3RM','Taille'];
   // Physical radar normalized vs standard
   var physStd=eq().stdPhys[j.poste]||DEF_PHYS[j.poste]||{v20:3,v40:5.5,squat:90,dc:65,tp:70,taille:165};
   var physVals=[j.v20||0,j.v40||0,j.squat3||0,j.dc3||0,j.tp3||0,j.taille||0];
@@ -2261,12 +2269,8 @@ function initRadar(j){
     return Math.min(10,Math.round((v/s)*10));
   });
 
-  var triColors=['#3FBFE8','#22c55e','#f59e0b'];
-  var t=activeTri-1;
   var datasets=[
-    {label:'T'+activeTri,data:j.radar[t]||[5,5,5,5,5,5],backgroundColor:triColors[t],borderRadius:4,barPercentage:.7},
-    {label:'Physique (normé)',data:physNorm,backgroundColor:'rgba(239,68,68,.55)',borderRadius:4,barPercentage:.7},
-    {label:'Attendu Tech ('+j.poste+')',data:std,backgroundColor:'rgba(10,31,61,.25)',borderRadius:4,barPercentage:.7}
+    {label:'Physique (normé)',data:physNorm,backgroundColor:'rgba(239,68,68,.55)',borderRadius:4,barPercentage:.7}
   ];
 
   radarInst=new Chart(ctx,{
@@ -2277,6 +2281,23 @@ function initRadar(j){
       plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}}}
   });
   renderProfilPhysAttendus(j);
+  renderCertifTechChart(j);
+}
+// Certification technique de la joueuse (niveaux 0-4), meme presentation que le referentiel d'equipe
+function renderCertifTechChart(j){
+  var canvas=document.getElementById('certifTechChart');
+  if(!canvas) return;
+  var crits=getCritForPoste(j.poste);
+  var ctx=canvas.getContext('2d');
+  if(certifTechInst) certifTechInst.destroy();
+  var data=crits.map(function(c){var v=(j.critTech||{})[c.key];return v!==undefined?v:0;});
+  var colors=crits.map(function(c){var v=(j.critTech||{})[c.key];return v!==undefined?NIV_L_COLORS[v]:'#e5e7eb';});
+  certifTechInst=new Chart(ctx,{type:'bar',
+    data:{labels:crits.map(function(c){return c.label;}),datasets:[{label:j.nom,data:data,backgroundColor:colors,borderRadius:4,barPercentage:.6}]},
+    options:{indexAxis:'y',
+      scales:{x:{min:0,max:4,ticks:{stepSize:1,font:{size:9}},grid:{color:'#EEF1F6'}},y:{grid:{display:false},ticks:{font:{size:10,weight:'600'}}}},
+      plugins:{legend:{display:false}}}
+  });
 }
 
 function updateProfile(){
@@ -2393,9 +2414,10 @@ function updateProfilStats(j){
   var ess=mj.reduce(function(a,m){return a+(m.compo[j.id].essais||0);},0);
   var transfo=mj.reduce(function(a,m){return a+(m.compo[j.id].transfos||0);},0);
   var pen=mj.reduce(function(a,m){return a+(m.compo[j.id].penalites||0);},0);
+  var drops=mj.reduce(function(a,m){return a+(m.compo[j.id].drops||0);},0);
   var cart=mj.reduce(function(a,m){return a+(m.compo[j.id].cartons||0);},0);
   var bless=mj.reduce(function(a,m){return a+(m.compo[j.id].blessures||0);},0);
-  var pts=ess*5+transfo*2+pen*3;
+  var pts=ess*5+transfo*2+pen*3+drops*3;
   document.getElementById('ps-matchs').innerText=mj.length;
   document.getElementById('ps-tit-only').innerText=tit;
   document.getElementById('ps-rempl').innerText=rempl;
@@ -2406,6 +2428,8 @@ function updateProfilStats(j){
   document.getElementById('ps-penalites').innerText=pen;
   document.getElementById('ps-points').innerText=pts;
   document.getElementById('ps-cartons').innerText=cart;
+  var dropsEl=document.getElementById('ps-drops');
+  if(dropsEl) dropsEl.innerText=drops;
   var blessEl=document.getElementById('ps-blessures');
   if(blessEl) blessEl.innerText=bless;
   // Presences
@@ -2477,25 +2501,6 @@ function setCustomStat(k,v){var j=eq().joueurs.find(function(x){return x.id===wi
 function delCustomStat(k){var j=eq().joueurs.find(function(x){return x.id===window.activePlayerId;});if(j){delete j.customStats[k];scheduleSave();renderCustomStats(j);}}
 
 // Radar config
-function openModalRadarConfig(){
-  // For now just show the 6 fixed axes for current player's poste
-  var j=eq().joueurs.find(function(x){return x.id===window.activePlayerId;});
-  var labels=j?getRadarLabels(j.poste):TECH_AXES_BASE.concat(['Specifique']);
-  var cont=document.getElementById('radar-axis-list'); cont.innerHTML='';
-  labels.forEach(function(l,i){
-    var div=document.createElement('div'); div.className='flex items-center gap-2';
-    div.innerHTML='<input type="text" value="'+l+'" id="ra-'+i+'" class="flex-1 border rounded-lg p-2 text-xs">'+
-      (i>=5?'':'<span class="text-xs text-gray-400">'+(i<5?'Commun':'Specifique poste')+'</span>');
-    cont.appendChild(div);
-  });
-  openModal('modal-radar-config');
-}
-function addRadarAxis(){alert('Les axes du radar rugby sont fixes (5 communs + 1 specifique au poste). Modifiez les noms si besoin.');}
-function saveRadarConfig(){
-  // Custom labels stored per-poste could be added later; for now just close
-  closeModal('modal-radar-config');
-}
-
 // =================================================
 // MATCHS
 // =================================================
@@ -2651,6 +2656,249 @@ function viewCompo(id){
     sv('ccart-'+jid,c.cartons);sv('cnote-'+jid,c.note);
   });
 }
+
+// =================================================
+// ONGLET ANALYSE — saisie stats post-match, liee a un match "Matchs Equipe"
+// =================================================
+var POSTE_COLORS={
+  'Pilier':'#b91c1c','Talonneuse':'#c2410c','2eme ligne':'#0369a1','3eme ligne aile':'#15803d',
+  '8':'#6d28d9','9':'#a16207','10':'#be185d','Centre':'#0891b2','Ailiere':'#4d7c0f','15':'#1e293b'
+};
+var ANALYSE_STAT_TYPES_BASE=[
+  {key:'essais',label:'Essai',points:5,icon:'🏉'},
+  {key:'transfos',label:'Transfo',points:2,icon:'🎯'},
+  {key:'penalites',label:'Pénalité',points:3,icon:'⚡'},
+  {key:'drops',label:'Drop',points:3,icon:'🦶'},
+  {key:'cartonJ',label:'Jaune',points:0,icon:'🟨'},
+  {key:'cartonR',label:'Rouge',points:0,icon:'🟥'},
+  {key:'cartonB',label:'Bleu',points:0,icon:'🟦'}
+];
+var activeAnalyseMatchId=null;
+var analysePosteFilter=null;
+
+function getAnalyseStatTypes(){
+  return ANALYSE_STAT_TYPES_BASE.concat(eq().customStatTypes||[]);
+}
+function addCustomAnalyseStat(){
+  var label=prompt("Nom du nouveau type de statistique (ex: Ballon volé, Plaquage manqué...)");
+  if(!label) return;
+  var ptsRaw=prompt("Points associés à cette statistique (0 si aucun)","0");
+  var pts=parseInt(ptsRaw)||0;
+  if(!eq().customStatTypes) eq().customStatTypes=[];
+  eq().customStatTypes.push({key:'custom_'+Date.now(),label:label.trim(),points:pts,icon:'⭐'});
+  scheduleSave();
+  renderAnalyseCustomStatsMgmt();
+  renderAnalyseRoster();
+}
+function removeCustomAnalyseStat(key){
+  if(!confirm('Supprimer ce type de statistique pour toute l\'équipe ?')) return;
+  eq().customStatTypes=(eq().customStatTypes||[]).filter(function(s){return s.key!==key;});
+  scheduleSave();
+  renderAnalyseCustomStatsMgmt();
+  renderAnalyseRoster();
+}
+function findPlayerAnywhere(id){
+  var found=getAllAvailableForCompo().find(function(p){return p.j.id===id;});
+  return found?found.j:null;
+}
+function toggleAnalysePosteFilter(poste){
+  analysePosteFilter=(analysePosteFilter===poste)?null:poste;
+  renderAnalyseLegend();
+  renderAnalyseRoster();
+}
+function renderAnalyseLegend(){
+  var cont=document.getElementById('an-legend');
+  if(!cont) return;
+  var allActive=!analysePosteFilter;
+  var html='<button onclick="toggleAnalysePosteFilter(null)" class="text-xs font-bold px-2 py-1 rounded-full border-2" style="'+(allActive?'background:#0A1F3D;color:#fff;border-color:#0A1F3D':'background:#fff;color:#64748b;border-color:#e5e7eb')+'">Toutes</button>';
+  html+=POSTES_ALL.map(function(p){
+    var active=analysePosteFilter===p;
+    var color=POSTE_COLORS[p]||'#64748b';
+    return '<button onclick="toggleAnalysePosteFilter(\''+p+'\')" class="text-xs font-bold px-2 py-1 rounded-full border-2" style="'+(active?'background:'+color+';color:#fff;border-color:'+color:'background:#fff;color:'+color+';border-color:'+color)+'">'+p+'</button>';
+  }).join('');
+  cont.innerHTML=html;
+}
+function renderAnalyseCustomStatsMgmt(){
+  var cont=document.getElementById('an-custom-mgmt');
+  if(!cont) return;
+  var customs=eq().customStatTypes||[];
+  if(!customs.length){cont.innerHTML='';return;}
+  cont.innerHTML='<span class="text-[10px] text-gray-400 font-bold uppercase self-center">Stats perso :</span>'+customs.map(function(s){
+    return '<span class="text-[10px] font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-600 flex items-center gap-1">'+s.icon+' '+s.label+
+      '<span onclick="removeCustomAnalyseStat(\''+s.key+'\')" class="cursor-pointer text-gray-400 hover:text-red-500 ml-1" title="Supprimer ce type de stat">×</span></span>';
+  }).join('');
+}
+function renderAnalyseTab(){
+  var sel=document.getElementById('an-match-select');
+  var matches=[].concat(eq().matchs).sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+  sel.innerHTML='<option value="">— Sélectionner un match —</option>'+matches.map(function(m){
+    return '<option value="'+m.id+'">'+(m.journee?m.journee+' — ':'')+m.adv+' ('+(m.date||'?')+')'+(m.type==='amical'?' [Amical]':'')+'</option>';
+  }).join('');
+  if(activeAnalyseMatchId && matches.find(function(m){return m.id===activeAnalyseMatchId;})){
+    sel.value=activeAnalyseMatchId;
+  } else {
+    activeAnalyseMatchId=null;
+  }
+  analysePosteFilter=null;
+  renderAnalyseLegend();
+  renderAnalyseCustomStatsMgmt();
+  loadAnalyseMatch();
+}
+function loadAnalyseMatch(){
+  var id=parseInt(document.getElementById('an-match-select').value)||null;
+  activeAnalyseMatchId=id;
+  var info=document.getElementById('an-match-info');
+  var roster=document.getElementById('an-roster');
+  if(!id){
+    info.innerHTML='';
+    roster.innerHTML='<p class="text-xs text-gray-400 italic col-span-full">Sélectionnez un match ci-dessus (créé dans l\'onglet "Matchs Equipe") pour commencer la saisie des statistiques.</p>';
+    return;
+  }
+  var m=eq().matchs.find(function(x){return x.id===id;});
+  if(!m) return;
+  var nbTit=Object.values(m.compo||{}).filter(function(c){return c.role==='Titulaire';}).length;
+  var nbRempl=Object.values(m.compo||{}).filter(function(c){return c.role==='Remplacante';}).length;
+  info.innerHTML='<i class="fas fa-circle-info mr-1"></i>'+m.adv+' · '+(m.date||'?')+' · Score '+m.scoreP+' - '+m.scoreC+' · '+nbTit+' titulaires + '+nbRempl+' remplaçantes ('+Object.keys(m.compo||{}).length+' au total)';
+  renderAnalyseRoster();
+}
+function renderAnalyseRoster(){
+  var roster=document.getElementById('an-roster');
+  if(!roster) return;
+  var m=eq().matchs.find(function(x){return x.id===activeAnalyseMatchId;});
+  if(!m){roster.innerHTML='';return;}
+  if(!m.compo) m.compo={};
+  var ids=Object.keys(m.compo);
+  if(ids.length===0){
+    roster.innerHTML='<p class="text-xs text-gray-400 italic col-span-full">Aucune joueuse sélectionnée pour ce match. Cliquez sur "Choisir les 23 joueuses".</p>';
+    return;
+  }
+  var statTypes=getAnalyseStatTypes();
+  var players=ids.map(function(jid){
+    var j=findPlayerAnywhere(parseInt(jid));
+    return j?{jid:jid,j:j,c:m.compo[jid]}:null;
+  }).filter(Boolean);
+  if(analysePosteFilter){
+    players=players.filter(function(p){return (p.c.poste||p.j.poste)===analysePosteFilter;});
+  }
+  players.sort(function(a,b){
+    if((a.c.role||'')!==(b.c.role||'')) return a.c.role==='Titulaire'?-1:1;
+    return (a.j.numero||99)-(b.j.numero||99);
+  });
+  if(players.length===0){
+    roster.innerHTML='<p class="text-xs text-gray-400 italic col-span-full">Aucune joueuse à ce poste dans la feuille de match (titulaires + remplaçantes confondues).</p>';
+    return;
+  }
+  roster.innerHTML=players.map(function(p){return renderAnalysePlayerCard(p.jid,p.j,p.c,statTypes);}).join('');
+}
+function renderAnalysePlayerCard(jid,j,c,statTypes){
+  var color=POSTE_COLORS[c.poste||j.poste]||'#64748b';
+  var role=c.role||'Remplacante';
+  var roleStyle=role==='Titulaire'?'background:#dcfce7;color:#15803d':'background:#f1f5f9;color:#64748b';
+  var html='<div class="bg-white rounded-xl shadow-sm p-3" style="border-left:4px solid '+color+'">';
+  html+='<div class="flex items-center justify-between mb-2">';
+  html+='<div class="flex items-center gap-2">';
+  html+='<span class="w-8 h-8 rounded-full flex items-center justify-center text-white font-black text-xs shrink-0" style="background:'+color+'">'+(j.numero?'#'+j.numero:j.poste.slice(0,2).toUpperCase())+'</span>';
+  html+='<div><div class="font-bold text-xs leading-tight">'+j.nom+'</div><div class="text-[10px] font-bold uppercase" style="color:'+color+'">'+(c.poste||j.poste)+'</div></div>';
+  html+='</div>';
+  html+='<button onclick="toggleAnalyseRole(\''+jid+'\')" class="text-[10px] font-black px-2 py-1 rounded-full" style="'+roleStyle+'">'+role+'</button>';
+  html+='</div>';
+  html+='<div class="flex items-center gap-2 mb-2 text-[10px]">';
+  html+='<span class="text-gray-400 font-bold">MIN</span>';
+  html+='<input type="number" min="0" max="80" value="'+(c.mins||0)+'" class="border rounded w-14 p-1 text-center text-xs" onchange="setAnalyseMins(\''+jid+'\',this.value)">';
+  html+='<button onclick="removeFromAnalyse(\''+jid+'\')" class="ml-auto text-gray-300 hover:text-red-500 text-xs" title="Retirer du match"><i class="fas fa-trash"></i></button>';
+  html+='</div>';
+  html+='<div class="grid grid-cols-4 gap-1">';
+  statTypes.forEach(function(st){
+    var val=st.key.indexOf('custom_')===0?((c.customStats||{})[st.key]||0):(c[st.key]||0);
+    html+='<div class="flex flex-col items-center bg-gray-50 rounded-lg py-1.5">';
+    html+='<span style="font-size:13px;line-height:1">'+st.icon+'</span>';
+    html+='<span class="text-[8px] font-bold text-gray-400 uppercase text-center leading-tight px-0.5">'+st.label+(st.points?' ('+st.points+')':'')+'</span>';
+    html+='<div class="flex items-center gap-1 mt-1">';
+    html+='<button onclick="bumpAnalyseStat(\''+jid+'\',\''+st.key+'\',-1)" class="w-4 h-4 rounded bg-white border border-gray-200 text-gray-400 text-[10px] leading-none font-bold">–</button>';
+    html+='<span class="text-xs font-black w-4 text-center">'+val+'</span>';
+    html+='<button onclick="bumpAnalyseStat(\''+jid+'\',\''+st.key+'\',1)" class="w-4 h-4 rounded text-white text-[10px] leading-none font-bold" style="background:'+color+'">+</button>';
+    html+='</div></div>';
+  });
+  html+='</div></div>';
+  return html;
+}
+function toggleAnalyseRole(jid){
+  var m=eq().matchs.find(function(x){return x.id===activeAnalyseMatchId;}); if(!m||!m.compo) return;
+  var c=m.compo[jid]; if(!c) return;
+  c.role=c.role==='Titulaire'?'Remplacante':'Titulaire';
+  scheduleSave();renderAnalyseRoster();
+}
+function setAnalyseMins(jid,val){
+  var m=eq().matchs.find(function(x){return x.id===activeAnalyseMatchId;}); if(!m||!m.compo) return;
+  var c=m.compo[jid]; if(!c) return;
+  c.mins=Math.max(0,parseInt(val)||0);
+  scheduleSave();
+}
+function bumpAnalyseStat(jid,key,delta){
+  var m=eq().matchs.find(function(x){return x.id===activeAnalyseMatchId;}); if(!m||!m.compo) return;
+  var c=m.compo[jid]; if(!c) return;
+  if(key.indexOf('custom_')===0){
+    if(!c.customStats) c.customStats={};
+    c.customStats[key]=Math.max(0,(c.customStats[key]||0)+delta);
+  } else {
+    c[key]=Math.max(0,(c[key]||0)+delta);
+    if(key==='cartonJ'||key==='cartonR'||key==='cartonB'){
+      c.cartons=(c.cartonJ||0)+(c.cartonR||0)+(c.cartonB||0);
+    }
+  }
+  scheduleSave();renderAnalyseRoster();
+}
+function removeFromAnalyse(jid){
+  var m=eq().matchs.find(function(x){return x.id===activeAnalyseMatchId;}); if(!m||!m.compo) return;
+  delete m.compo[jid];
+  scheduleSave();renderAnalyseRoster();loadAnalyseMatch();
+}
+function openAnalysePicker(){
+  if(!activeAnalyseMatchId){alert('Sélectionnez d\'abord un match dans la liste.');return;}
+  var m=eq().matchs.find(function(x){return x.id===activeAnalyseMatchId;}); if(!m) return;
+  if(!m.compo) m.compo={};
+  var list=document.getElementById('an-picker-list'); list.innerHTML='';
+  var players=getAllAvailableForCompo();
+  players.forEach(function(p){
+    var j=p.j;
+    var existing=m.compo[j.id];
+    var color=POSTE_COLORS[j.poste]||'#64748b';
+    var row=document.createElement('div');
+    row.className='flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-50';
+    row.innerHTML='<input type="checkbox" id="anp-chk-'+j.id+'" '+(existing?'checked':'')+' class="w-3.5 h-3.5">'+
+      '<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:'+color+'"></span>'+
+      '<span class="flex-1 font-bold">'+j.nom+(p.sourceTeam!==curEq?' '+EQ_ICONS[p.sourceTeam]:'')+'</span>'+
+      '<span class="text-gray-400 text-[10px] uppercase w-24">'+j.poste+'</span>'+
+      '<select id="anp-role-'+j.id+'" class="border rounded text-[10px] p-0.5">'+
+      '<option'+((!existing||existing.role==='Titulaire')?' selected':'')+'>Titulaire</option>'+
+      '<option'+(existing&&existing.role==='Remplacante'?' selected':'')+'>Remplacante</option></select>';
+    list.appendChild(row);
+  });
+  openModal('modal-analyse-picker');
+}
+function confirmAnalysePicker(){
+  var m=eq().matchs.find(function(x){return x.id===activeAnalyseMatchId;}); if(!m) return;
+  var players=getAllAvailableForCompo();
+  var newCompo={};
+  players.forEach(function(p){
+    var j=p.j;
+    var chk=document.getElementById('anp-chk-'+j.id);
+    if(chk&&chk.checked){
+      var role=document.getElementById('anp-role-'+j.id).value;
+      var existing=(m.compo&&m.compo[j.id])||{};
+      newCompo[j.id]={role:role,poste:j.poste,mins:existing.mins||0,
+        essais:existing.essais||0,transfos:existing.transfos||0,penalites:existing.penalites||0,
+        drops:existing.drops||0,cartonJ:existing.cartonJ||0,cartonR:existing.cartonR||0,cartonB:existing.cartonB||0,
+        cartons:existing.cartons||0,blessures:existing.blessures||0,note:existing.note||null,
+        customStats:existing.customStats||{}};
+    }
+  });
+  m.compo=newCompo;
+  scheduleSave();
+  closeModal('modal-analyse-picker');
+  loadAnalyseMatch();
+}
+
 function renderMatchHistory(){
   var list=document.getElementById('match-history-list'); list.innerHTML='';
   var sorted=[].concat(eq().matchs).reverse();
@@ -2873,22 +3121,10 @@ function toggleAtt(jid,date){
 // =================================================
 // STANDARDS
 // =================================================
-function getTechLabels(poste){return TECH_AXES_BASE.concat([TECH_AXE6[poste]||'Specifique']);}
 function loadStdTech(){
   var poste=document.getElementById('std-poste-select').value;
-  var vals=(eq().stdTech[poste]||DEF_TECH[poste]||[7,7,7,7,7,7]).slice(0,6);
-  var labels=getTechLabels(poste);
-  var cont=document.getElementById('std-tech-sliders'); cont.innerHTML='';
-  labels.forEach(function(l,i){
-    var v=vals[i]!==undefined?vals[i]:7;
-    var div=document.createElement('div');
-    div.innerHTML='<div class="flex justify-between"><span class="text-xs font-bold text-gray-500">'+l+'</span>'+
-      '<span id="stv-'+i+'" class="text-xs font-black text-mhr">'+v+'</span></div>'+
-      '<input type="range" min="0" max="10" step="1" value="'+v+'" id="sts-'+i+'" '+
-      'oninput="document.getElementById(\'stv-'+i+'\').innerText=this.value;updateStdTechRadar()" class="w-full" style="accent-color:#003366">';
-    cont.appendChild(div);
-  });
-  updateStdTechRadar(vals,poste);
+  updateStdTechRadar(poste);
+  renderTechComparison(poste);
   renderCritRef(poste);
 }
 
@@ -2922,22 +3158,53 @@ function renderCritRefTable(c){
   html+='</div>';
   return html;
 }
-function updateStdTechRadar(initial,poste){
+// Moyenne d'equipe par critere (0-4), calculee a partir des classifications reelles des joueuses de ce poste
+function computeCritTeamAverages(poste){
+  var crits=getCritForPoste(poste);
+  var joueurs=eq().joueurs.filter(function(j){return j.poste===poste;});
+  return crits.map(function(c){
+    var vals=joueurs.map(function(j){return (j.critTech||{})[c.key];}).filter(function(v){return v!==undefined&&v!==null;});
+    var avg=vals.length?(vals.reduce(function(a,b){return a+b;},0)/vals.length):0;
+    return {label:c.label,avg:avg,n:vals.length};
+  });
+}
+function updateStdTechRadar(poste){
   poste=poste||document.getElementById('std-poste-select').value;
-  var data=initial||getTechLabels(poste).map(function(_,i){return parseInt(document.getElementById('sts-'+i).value)||7;});
+  var rows=computeCritTeamAverages(poste);
   var ctx=document.getElementById('stdTechRadar').getContext('2d');
   if(stdTechRadarInst) stdTechRadarInst.destroy();
   stdTechRadarInst=new Chart(ctx,{type:'bar',
-    data:{labels:getTechLabels(poste),datasets:[{label:'Attendu '+poste,data:data,backgroundColor:'#0A1F3D',borderRadius:4,barPercentage:.6}]},
+    data:{labels:rows.map(function(r){return r.label;}),datasets:[{label:'Moyenne équipe — '+poste,data:rows.map(function(r){return Math.round(r.avg*10)/10;}),backgroundColor:rows.map(function(r){return NIV_L_COLORS[Math.round(r.avg)]||'#0A1F3D';}),borderRadius:4,barPercentage:.6}]},
     options:{indexAxis:'y',
-      scales:{x:{min:0,max:10,ticks:{stepSize:2,font:{size:9}},grid:{color:'#EEF1F6'}},y:{grid:{display:false},ticks:{font:{size:10,weight:'600'}}}},
-      plugins:{legend:{display:false}}}
+      scales:{x:{min:0,max:4,ticks:{stepSize:1,font:{size:9}},grid:{color:'#EEF1F6'}},y:{grid:{display:false},ticks:{font:{size:10,weight:'600'}}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){var r=rows[ctx.dataIndex];return r.n+' joueuse(s) évaluée(s) — moyenne '+ctx.parsed.x;}}}}}
   });
 }
-function saveStdTech(){
-  var poste=document.getElementById('std-poste-select').value;
-  eq().stdTech[poste]=getTechLabels(poste).map(function(_,i){return parseInt(document.getElementById('sts-'+i).value)||7;});
-  save();alert('Techniques "'+poste+'" sauvegardes');
+// Tableau "joueuses du poste vs standard" par niveaux (equivalent technique du comparatif physique)
+function renderTechComparison(poste){
+  var cont=document.getElementById('tech-comparison');
+  if(!cont) return;
+  var crits=getCritForPoste(poste);
+  var joueurs=eq().joueurs.filter(function(j){return j.poste===poste;});
+  if(!joueurs.length){cont.innerHTML='<p class="text-gray-400 italic text-xs">Aucune joueuse à ce poste.</p>';return;}
+  if(!crits.length){cont.innerHTML='<p class="text-gray-400 italic text-xs">Aucun critère référencé.</p>';return;}
+  var html='<table class="w-full border-collapse text-xs"><thead><tr class="border-b text-gray-400"><th class="text-left py-1 pr-2">Joueuse</th>';
+  crits.forEach(function(c){html+='<th class="px-1 text-center">'+c.label+'</th>';});
+  html+='</tr></thead><tbody>';
+  joueurs.forEach(function(j){
+    html+='<tr class="border-b"><td class="py-1 pr-2 font-semibold whitespace-nowrap">'+j.nom+'</td>';
+    crits.forEach(function(c){
+      var v=(j.critTech||{})[c.key];
+      html+='<td class="text-center py-1"><span class="crit-level-badge inline-flex" style="background:'+(v!==undefined?NIV_L_COLORS[v]:'#e5e7eb')+';color:'+(v!==undefined?'#fff':'#9ca3af')+'">'+(v!==undefined?'N'+v:'—')+'</span></td>';
+    });
+    html+='</tr>';
+  });
+  html+='<tr class="bg-blue-50 font-bold text-mhr"><td class="py-1">Moyenne équipe</td>';
+  computeCritTeamAverages(poste).forEach(function(r){
+    html+='<td class="text-center py-1">'+(r.n?r.avg.toFixed(1):'—')+'</td>';
+  });
+  html+='</tr></tbody></table>';
+  cont.innerHTML=html;
 }
 
 function loadStdPhys(){
@@ -3841,6 +4108,11 @@ function renderPlanning(){
 }
 
 function openCellTextEditor(key,cell){
+  var curType=eq().planning[key]||pgType;
+  if(curType==='match'||curType==='amical'){
+    openMatchCellEditor(key);
+    return;
+  }
   var cur=eq().planningText[key]||'';
   var txt=prompt('Texte pour cette case (laisser vide pour effacer):',cur);
   if(txt===null) return;
@@ -3851,6 +4123,40 @@ function openCellTextEditor(key,cell){
     if(!eq().planning[key]) eq().planning[key]=pgType||'';
   }
   scheduleSave();renderPlanning();
+}
+
+var matchCellKey=null,matchCellLieu='dom';
+function openMatchCellEditor(key){
+  matchCellKey=key;
+  var cur=eq().planningText[key]||'';
+  matchCellLieu=cur.indexOf('✈️')===0?'ext':'dom';
+  var adv=cur.replace('🏠','').replace('✈️','').trim();
+  document.getElementById('mc-adv').value=adv;
+  updateMatchCellLieuUI();
+  openModal('modal-match-cell');
+}
+function setMatchCellLieu(l){
+  matchCellLieu=l;
+  updateMatchCellLieuUI();
+}
+function updateMatchCellLieuUI(){
+  var domBtn=document.getElementById('mc-btn-dom'),extBtn=document.getElementById('mc-btn-ext');
+  if(domBtn) domBtn.className='flex-1 px-3 py-2 rounded-lg font-bold text-xs border-2 '+(matchCellLieu==='dom'?'bg-green-50 border-green-500 text-green-700':'bg-white border-gray-200 text-gray-400');
+  if(extBtn) extBtn.className='flex-1 px-3 py-2 rounded-lg font-bold text-xs border-2 '+(matchCellLieu==='ext'?'bg-blue-50 border-blue-500 text-blue-700':'bg-white border-gray-200 text-gray-400');
+}
+function confirmMatchCellEditor(){
+  var adv=document.getElementById('mc-adv').value.trim();
+  var key=matchCellKey;
+  if(!key) return;
+  if(!adv){
+    delete eq().planningText[key];
+  } else {
+    eq().planningText[key]=(matchCellLieu==='ext'?'✈️':'🏠')+' '+adv;
+    if(!eq().planning[key]) eq().planning[key]=pgType||'match';
+  }
+  scheduleSave();
+  closeModal('modal-match-cell');
+  renderPlanning();
 }
 
 function handleMergeClick(key,cell){
@@ -4029,6 +4335,7 @@ function setCritLevel(jid,key,niveau){
   else { j.critTech[key]=niveau; }
   scheduleSave();
   buildNivTechBand(j);
+  renderCertifTechChart(j);
 }
 
 // =================================================
